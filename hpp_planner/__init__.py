@@ -26,6 +26,13 @@ from hpp_planner.trajectory_utils import (
     extract_joint_config,
 )
 from hpp_planner.ros2_sender import send_trajectory, send_trajectory_async
+from hpp_planner.gripper import (
+    execute_manipulation,
+    extract_grasp_transitions,
+    GraspTransition,
+    GripperCommandController,
+    JointTrajectoryGripperController,
+)
 
 __all__ = [
     "send_trajectory",
@@ -33,4 +40,9 @@ __all__ = [
     "waypoints_to_joint_trajectory",
     "add_time_parameterization",
     "extract_joint_config",
+    "execute_manipulation",
+    "extract_grasp_transitions",
+    "GraspTransition",
+    "GripperCommandController",
+    "JointTrajectoryGripperController",
 ]
