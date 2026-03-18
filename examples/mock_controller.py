@@ -6,8 +6,8 @@ Accepts FollowJointTrajectory goals and publishes /joint_states
 so you can visualize trajectory execution in RViz2.
 
 Usage:
-    # Terminal 1: Start mock controller
-    python3 examples/mock_controller.py --urdf robots/ur5/ur5.urdf
+    # Terminal 1: Start mock controller (add --gripper for manipulation)
+    python3 examples/mock_controller.py --urdf robots/ur5/ur5.urdf --gripper
 
     # Terminal 2: Start RViz2
     rviz2
@@ -40,17 +40,18 @@ import rclpy
 from rclpy.node import Node
 from rclpy.action import ActionServer
 from rclpy.executors import MultiThreadedExecutor
-from control_msgs.action import FollowJointTrajectory
+from control_msgs.action import FollowJointTrajectory, GripperCommand
 from sensor_msgs.msg import JointState
 from std_msgs.msg import String
 
 
 class MockController(Node):
-    def __init__(self, joint_names: list, urdf_content: str = None):
+    def __init__(self, joint_names: list, urdf_content: str = None, enable_gripper: bool = False):
         super().__init__("mock_controller")
 
         self.joint_names = joint_names
         self.current_positions = [0.0] * len(joint_names)
+        self.gripper_position = 0.04  # Start open
 
         # Action server for trajectory execution
         self._action_server = ActionServer(
@@ -59,6 +60,15 @@ class MockController(Node):
             "/joint_trajectory_controller/follow_joint_trajectory",
             self.execute_callback,
         )
+
+        # Mock gripper action server
+        if enable_gripper:
+            self._gripper_server = ActionServer(
+                self,
+                GripperCommand,
+                "/gripper_controller/gripper_command",
+                self.gripper_callback,
+            )
 
         # Publisher for joint states (RViz2 visualization)
         self.joint_state_pub = self.create_publisher(JointState, "/joint_states", 10)
@@ -83,6 +93,8 @@ class MockController(Node):
         self.get_logger().info(f"  Joints: {joint_names}")
         self.get_logger().info("  Publishing: /joint_states @ 50Hz")
         self.get_logger().info("  Action: /joint_trajectory_controller/follow_joint_trajectory")
+        if enable_gripper:
+            self.get_logger().info("  Gripper: /gripper_controller/gripper_command")
         self.get_logger().info("")
         self.get_logger().info("  Open RViz2 and add RobotModel display")
         self.get_logger().info("=" * 60)
@@ -147,6 +159,31 @@ class MockController(Node):
         goal_handle.succeed()
         return FollowJointTrajectory.Result()
 
+    def gripper_callback(self, goal_handle):
+        position = goal_handle.request.command.position
+        max_effort = goal_handle.request.command.max_effort
+
+        state = "OPEN" if position > 0.01 else "CLOSED"
+        self.get_logger().info("")
+        self.get_logger().info("=" * 50)
+        self.get_logger().info(f"GRIPPER {state}")
+        self.get_logger().info(f"  Position: {position:.4f}")
+        self.get_logger().info(f"  Max effort: {max_effort:.1f}")
+
+        # Simulate gripper motion
+        self.gripper_position = position
+        time.sleep(0.5)
+
+        self.get_logger().info("  COMPLETE")
+        self.get_logger().info("=" * 50)
+
+        goal_handle.succeed()
+        result = GripperCommand.Result()
+        result.position = position
+        result.reached_goal = True
+        result.stalled = False
+        return result
+
 
 def main():
     parser = argparse.ArgumentParser(description="Mock trajectory controller with RViz2 support")
@@ -155,6 +192,8 @@ def main():
                         default=["shoulder_pan_joint", "shoulder_lift_joint", "elbow_joint",
                                  "wrist_1_joint", "wrist_2_joint", "wrist_3_joint"],
                         help="Joint names (default: UR5 joints)")
+    parser.add_argument("--gripper", action="store_true",
+                        help="Enable mock gripper action server")
     args = parser.parse_args()
 
     # Read URDF if provided
@@ -172,7 +211,7 @@ def main():
             print(f"Warning: URDF not found: {urdf_path}")
 
     rclpy.init()
-    node = MockController(args.joints, urdf_content)
+    node = MockController(args.joints, urdf_content, enable_gripper=args.gripper)
 
     try:
         rclpy.spin(node)
