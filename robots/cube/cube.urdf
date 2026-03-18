@@ -1,0 +1,24 @@
+<?xml version="1.0" ?>
+<!-- Simple 4cm cube for HPP manipulation planning. -->
+<robot name="cube">
+  <link name="base_link">
+    <visual>
+      <geometry>
+        <box size="0.04 0.04 0.04"/>
+      </geometry>
+      <material name="red">
+        <color rgba="0.9 0.2 0.1 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.04 0.04 0.04"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="0.1"/>
+      <inertia ixx="0.0000267" iyy="0.0000267" izz="0.0000267"
+               ixy="0" ixz="0" iyz="0"/>
+    </inertial>
+  </link>
+</robot>

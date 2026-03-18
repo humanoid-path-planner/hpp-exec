@@ -1,0 +1,13 @@
+<?xml version="1.0" ?>
+<!-- Cube SRDF for HPP manipulation: defines a handle on top of the cube. -->
+<robot name="cube">
+  <!-- Handle on top of the cube for top-down grasps.
+       Position is at the cube center, with Z-axis pointing up.
+       The quaternion (0.7071 0 0.7071 0) rotates the handle frame
+       so the gripper approaches from above. -->
+  <handle name="handle" clearance="0.025">
+    <position> 0 0 0 0.7071067811865476 0 0.7071067811865476 0 </position>
+    <link name="base_link"/>
+    <mask> true true true false true true </mask>
+  </handle>
+</robot>
