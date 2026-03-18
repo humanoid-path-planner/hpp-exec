@@ -37,23 +37,26 @@ def waypoints_to_joint_trajectory(
     trajectory = JointTrajectory()
     trajectory.joint_names = joint_names
 
+    n_points = len(waypoints)
+
     for i, (wp, t) in enumerate(zip(waypoints, times)):
         point = JointTrajectoryPoint()
 
         # Extract relevant joint positions
         point.positions = [float(wp[j]) for j in joint_indices]
 
-        # Set velocities if provided, else zeros
+        # Set velocities if provided explicitly
         if velocities is not None and i < len(velocities):
             point.velocities = [float(velocities[i][j]) for j in joint_indices]
-        else:
+        elif i == 0 or i == n_points - 1:
+            # Zero velocity at start and end for smooth stop
             point.velocities = [0.0] * len(joint_names)
+        # Intermediate points: leave velocities empty for spline interpolation
 
-        # Set accelerations if provided, else zeros
+        # Set accelerations if provided explicitly
         if accelerations is not None and i < len(accelerations):
             point.accelerations = [float(accelerations[i][j]) for j in joint_indices]
-        else:
-            point.accelerations = [0.0] * len(joint_names)
+        # Leave accelerations empty for controller to compute
 
         # Convert time to Duration
         point.time_from_start = Duration(

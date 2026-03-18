@@ -43,7 +43,7 @@ class _TrajectorySenderNode(Node):
         self._result = None
 
     def send_and_wait(self, trajectory, timeout_sec: float = 60.0) -> bool:
-        """Send trajectory and wait for acceptance."""
+        """Send trajectory and wait for execution to complete."""
         if not self.client.wait_for_server(timeout_sec=10.0):
             self.get_logger().error("Trajectory controller not available")
             return False
@@ -51,9 +51,13 @@ class _TrajectorySenderNode(Node):
         goal = FollowJointTrajectory.Goal()
         goal.trajectory = trajectory
 
+        # Compute expected duration from last trajectory point
+        last_point = trajectory.points[-1]
+        duration = last_point.time_from_start.sec + last_point.time_from_start.nanosec * 1e-9
+
         self.get_logger().info(
             f"Sending trajectory: {len(trajectory.points)} points, "
-            f"{len(trajectory.joint_names)} joints"
+            f"{len(trajectory.joint_names)} joints, {duration:.1f}s"
         )
 
         future = self.client.send_goal_async(goal)
@@ -65,6 +69,17 @@ class _TrajectorySenderNode(Node):
             return False
 
         self.get_logger().info("Trajectory accepted, executing...")
+
+        # Wait for execution to complete
+        result_future = goal_handle.get_result_async()
+        rclpy.spin_until_future_complete(self, result_future, timeout_sec=timeout_sec)
+
+        result = result_future.result()
+        if result is None:
+            self.get_logger().error("Trajectory execution timed out")
+            return False
+
+        self.get_logger().info("Trajectory execution complete")
         return True
 
 
