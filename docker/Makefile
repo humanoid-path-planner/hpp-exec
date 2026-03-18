@@ -24,18 +24,24 @@ hpp-python_branch=devel
 hpp-python_repository=${HPP_REPO}
 hpp-python_extra_flags=${HPP_EXTRA_FLAGS} ${PYTHON_FLAGS}
 
+hpp-gepetto-viewer_branch=devel
+hpp-gepetto-viewer_repository=${HPP_REPO}
+hpp-gepetto-viewer_extra_flags=${HPP_EXTRA_FLAGS} ${PYTHON_FLAGS}
+
 # High-level targets
 
-all: hpp-python.install
+all: hpp-python.install hpp-gepetto-viewer.install
 	@echo ""
-	@echo "hpp-python installed. You can now run:"
+	@echo "hpp-python + hpp-gepetto-viewer installed. You can now run:"
 	@echo "  python3 -c 'from pyhpp.core import Problem; print(\"pyhpp OK\")'"
+	@echo "  python3 -c 'from pyhpp_viser import Viewer; print(\"viewer OK\")'"
 
 # Dependencies
 
 jrl-cmakemodules.configure.dep: jrl-cmakemodules.checkout
 hpp-manipulation.configure.dep: hpp-manipulation.checkout jrl-cmakemodules.install
 hpp-python.configure.dep: hpp-python.checkout jrl-cmakemodules.install hpp-manipulation.install
+hpp-gepetto-viewer.configure.dep: hpp-gepetto-viewer.checkout jrl-cmakemodules.install hpp-python.install
 
 # Generic targets
 

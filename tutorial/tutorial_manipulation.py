@@ -254,4 +254,9 @@ def main():
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    robot, problem, cg, path = plan_pick_and_place()
+    if path is not None:
+        full_wp, arm_wp, times = extract_waypoints(path)
+        print(f"  {len(arm_wp)} waypoints extracted")
+        print(f"  Start cube pos: {full_wp[0][9:12]}")
+        print(f"  End cube pos:   {full_wp[-1][9:12]}")
