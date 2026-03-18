@@ -56,40 +56,21 @@ send_trajectory(
 trajectory = waypoints_to_joint_trajectory(waypoints, times, joint_names)
 ```
 
-## Testing
-
-```bash
-# Terminal 1: Start mock controller
-./run.sh python3 examples/mock_controller.py --urdf robots/ur5/ur5.urdf
-
-# Terminal 2: View with rqt
-./run.sh rqt_graph
-
-# Terminal 3: Send test trajectory
-./run.sh python3 -c "
-from hpp_planner import send_trajectory
-import numpy as np
-waypoints = [np.array([0,0,0,0,0,0]), np.array([1.5,-0.5,-1.0,0.5,1.0,-0.5])]
-send_trajectory(waypoints, [0.0, 3.0],
-    joint_names=['shoulder_pan_joint','shoulder_lift_joint','elbow_joint',
-                 'wrist_1_joint','wrist_2_joint','wrist_3_joint'],
-    max_velocity=0.5)
-"
-```
-
 ## Tutorial
 
+Tutorials use the FR3 robot in Gazebo simulation.
+
 ```bash
-# Quick test with mock controller
-./run.sh python3 examples/mock_controller.py --urdf robots/ur5/ur5.urdf
-./run.sh python3 tutorial/tutorial_mock.py
+# Terminal 1: Launch Gazebo with FR3
+./run.sh
+./hpp-planning/scripts/launch_gazebo_gripper.sh
+
+# Terminal 2: Run tutorial
+docker exec -it hpp-planning bash
+python3 ~/devel/hpp-planning/tutorial/tutorial_gazebo.py
 ```
 
-See [tutorial/README.md](tutorial/README.md) for details.
-
-## Gripper / Manipulation Testing
-
-See [scripts/README.md](scripts/README.md) for testing gripper coordination with FR3 in Gazebo.
+See [tutorial/README.md](tutorial/README.md) for all tutorials.
 
 ## Structure
 

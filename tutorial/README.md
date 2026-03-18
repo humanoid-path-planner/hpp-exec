@@ -1,34 +1,46 @@
 # HPP-Planning Tutorials
 
-## Files
+All tutorials use the FR3 robot in Gazebo simulation.
 
-- `tutorial_mock.py` - Complete working example with mock controller (UR5)
-
-## Quick Test with Mock Controller
+## Setup
 
 ```bash
-# Terminal 1: Start mock controller
 cd ~/devel/hpp-planning
-./run.sh
-python3 examples/mock_controller.py --urdf robots/ur5/ur5.urdf
+./run.sh --rebuild   # first time only, to build the Docker image
+./run.sh             # start the container
+```
+
+## Simple Trajectory
+
+Send a multi-pose trajectory to the FR3 arm in Gazebo.
+
+```bash
+# Terminal 1: Launch Gazebo
+./hpp-planning/scripts/launch_gazebo_gripper.sh
 
 # Terminal 2: Run tutorial
 docker exec -it hpp-planning bash
-python3 tutorial/tutorial_mock.py
+python3 ~/devel/hpp-planning/tutorial/tutorial_gazebo.py
 ```
 
-## API Comparison
+## Pick-and-Place (Gripper Coordination)
 
-**Before (40+ lines of ROS2 code):**
-```python
-import rclpy
-from rclpy.action import ActionClient
-from control_msgs.action import FollowJointTrajectory
-# ... create node, action client, build message manually ...
+Demonstrates gripper open/close interleaved with arm trajectories.
+
+```bash
+# Terminal 1: Launch Gazebo (same as above)
+./hpp-planning/scripts/launch_gazebo_gripper.sh
+
+# Terminal 2: Run gripper test
+docker exec -it hpp-planning bash
+python3 ~/devel/hpp-planning/scripts/test_gripper_gazebo.py
 ```
 
-**After (3 lines with hpp_planner):**
+## API Overview
+
 ```python
 from hpp_planner import send_trajectory
-send_trajectory(waypoints, times, joint_names=JOINTS)
+
+# times are HPP path parameters — max_velocity rescales to real time
+send_trajectory(waypoints, times, joint_names=JOINTS, max_velocity=1.0)
 ```

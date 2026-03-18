@@ -55,6 +55,7 @@ RUN apt-get update -y && DEBIAN_FRONTEND=noninteractive apt-get install -qqy \
     ros-jazzy-gz-plugin-vendor \
     ros-jazzy-sdformat-urdf \
     ros-jazzy-gz-ros2-control \
+    ros-jazzy-ros-gz-sim \
     ros-jazzy-joint-state-publisher-gui \
     ros-jazzy-xacro \
     python3-yaml \
