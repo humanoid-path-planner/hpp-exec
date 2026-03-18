@@ -5,9 +5,8 @@ Test the gripper coordination code with FR3 in Gazebo simulation.
 ## Setup
 
 ```bash
-# Start the Docker container (from ~/devel)
-cd ~/devel
-tuto_hpp/run_docker.sh
+cd ~/devel/hpp-planning
+./run.sh
 ```
 
 ## Run
@@ -23,8 +22,8 @@ Wait until you see "Gazebo + gripper ready!".
 ### Terminal 2: Run the test
 
 ```bash
-docker exec -it hpp bash
-PYTHONPATH=$HOME/devel/hpp-planning:$PYTHONPATH python3 ~/devel/hpp-planning/scripts/test_gripper_gazebo.py
+docker exec -it hpp-planning bash
+python3 ~/devel/hpp-planning/scripts/test_gripper_gazebo.py
 ```
 
 ## What you should see

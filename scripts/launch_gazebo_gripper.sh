@@ -5,13 +5,11 @@
 # This launches the FR3 with hand:=true so the gripper fingers are
 # available in Gazebo, then spawns both arm and gripper controllers.
 #
-# Usage (inside hpp:tuto container):
-#   ./scripts/launch_gazebo_gripper.sh
+# Usage (inside hpp-planning container):
+#   ./hpp-planning/scripts/launch_gazebo_gripper.sh
 #
 # Then in another terminal:
-#   docker exec -it hpp bash
-#   source ~/devel/tuto_hpp/config.sh
-#   export PYTHONPATH=$HOME/devel/hpp-planning:$PYTHONPATH
+#   docker exec -it hpp-planning bash
 #   python3 ~/devel/hpp-planning/scripts/test_gripper_gazebo.py
 #
 
@@ -95,9 +93,7 @@ echo "Verify controllers are active:"
 echo "  ros2 control list_controllers"
 echo ""
 echo "In another terminal:"
-echo "  docker exec -it hpp bash"
-echo "  source ~/devel/tuto_hpp/config.sh"
-echo "  export PYTHONPATH=\$HOME/devel/hpp-planning:\$PYTHONPATH"
+echo "  docker exec -it hpp-planning bash"
 echo "  python3 ~/devel/hpp-planning/scripts/test_gripper_gazebo.py"
 echo "============================================"
 

@@ -24,6 +24,11 @@ if [ -f $DEVEL_HPP_DIR/ros2_ws/install/setup.bash ]; then
     source $DEVEL_HPP_DIR/ros2_ws/install/setup.bash
 fi
 
+# Franka Gazebo workspace
+if [ -f /opt/franka_ws/install/setup.bash ]; then
+    source /opt/franka_ws/install/setup.bash
+fi
+
 # hpp-planning on PYTHONPATH
 if [ -d $DEVEL_HPP_DIR/hpp-planning ]; then
     export PYTHONPATH=$DEVEL_HPP_DIR/hpp-planning:$PYTHONPATH
