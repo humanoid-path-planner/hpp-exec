@@ -83,6 +83,7 @@ RUN apt-get update && apt-get install -y python3-rosdep && \
     rosdep install --from-paths src --ignore-src -r -y && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
+RUN chown -R ${DOCKER_USER}:${DOCKER_GROUP} /opt/franka_ws /home/user
 USER user
 
 RUN cd /opt/franka_ws && \
@@ -91,10 +92,6 @@ RUN cd /opt/franka_ws && \
         franka_description \
         franka_gazebo_bringup \
     --cmake-args -DCMAKE_BUILD_TYPE=Release
-
-USER root
-RUN chown -R ${DOCKER_USER}:${DOCKER_GROUP} /home/user
-USER user
 
 RUN echo 'source /home/user/devel/config.sh 2>/dev/null' >> /home/user/.bashrc \
  && echo 'source /opt/ros/jazzy/setup.bash' >> /home/user/.bashrc \
