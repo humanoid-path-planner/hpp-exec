@@ -79,19 +79,17 @@ send_trajectory(waypoints, [0.0, 3.0],
 
 ## Tutorial
 
-Complete HPP + Gazebo pipeline:
-
 ```bash
 # Quick test with mock controller
-./run.sh python3 examples/mock_controller.py --urdf robots/fr3/fr3.urdf \
-    --joints fr3_joint1 fr3_joint2 fr3_joint3 fr3_joint4 fr3_joint5 fr3_joint6 fr3_joint7
+./run.sh python3 examples/mock_controller.py --urdf robots/ur5/ur5.urdf
 ./run.sh python3 tutorial/tutorial_mock.py
-
-# Full test with Gazebo
-./run.sh python3 tutorial/tutorial_hpp_gazebo.py
 ```
 
 See [tutorial/README.md](tutorial/README.md) for details.
+
+## Gripper / Manipulation Testing
+
+See [scripts/README.md](scripts/README.md) for testing gripper coordination with FR3 in Gazebo.
 
 ## Structure
 
@@ -99,16 +97,12 @@ See [tutorial/README.md](tutorial/README.md) for details.
 hpp-planning/
 ├── hpp_planner/           # Python package
 │   ├── __init__.py
-│   ├── ros2_sender.py     # send_trajectory()
-│   └── trajectory_utils.py
-├── tutorial/              # HPP + Gazebo tutorials
-│   ├── tutorial_mock.py
-│   └── tutorial_hpp_gazebo.py
-├── examples/
-│   ├── mock_controller.py # Test receiver
-│   ├── ur5_example.py
-│   ├── fer_example.py
-│   └── fr3_example.py
+│   ├── trajectory_utils.py # HPP config → ROS2 JointTrajectory conversion
+│   ├── ros2_sender.py     # send_trajectory() via FollowJointTrajectory action
+│   └── gripper.py         # Gripper coordination for manipulation trajectories
+├── scripts/               # Gazebo gripper testing (FR3)
+├── tutorial/              # HPP tutorials
+├── examples/              # Usage examples + mock controller
 ├── robots/                # URDF/SRDF for examples
 ├── docker/
 ├── Dockerfile

@@ -2,7 +2,6 @@
 
 ## Files
 
-- `example_api_usage.py` - Shows the before/after API comparison
 - `tutorial_mock.py` - Complete working example with mock controller (UR5)
 
 ## Quick Test with Mock Controller
