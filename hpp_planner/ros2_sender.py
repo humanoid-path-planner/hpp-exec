@@ -95,18 +95,35 @@ def send_trajectory(
     """
     Send a trajectory to ros2_control.
 
+    IMPORTANT: HPP path parameters are NOT real time. If you extract waypoints
+    from an HPP path using path(t), the times are path parameters (arc length),
+    not seconds. You must either:
+
+      1. Use max_velocity to rescale (simple, good enough for testing):
+           send_trajectory(waypoints, times, joints, max_velocity=1.0)
+
+      2. Time-parameterize inside HPP first (proper, recommended for production):
+           ps = problem.pathOptimizer("SimpleTimeParameterization")
+           timed_path = ps.optimize(path)
+           # Now times from timed_path are real seconds, no rescaling needed
+           send_trajectory(waypoints, times, joints)
+
+    If you pass raw path parameters without max_velocity, the trajectory will
+    execute at wrong speeds (typically way too fast).
+
     Args:
-        waypoints: List of configuration vectors (numpy arrays)
-        times: List of timestamps (seconds). If these are path parameters,
-               use max_velocity/max_acceleration to scale them.
-        joint_names: ROS2 joint names in order
-        controller_topic: FollowJointTrajectory action topic
-        max_velocity: If provided, rescale times to respect this limit (rad/s)
-        max_acceleration: If provided, rescale times to respect this limit (rad/s^2)
-        joint_indices: Indices to extract from each waypoint (default: 0 to len(joint_names))
+        waypoints: List of configuration vectors (numpy arrays).
+        times: List of timestamps in seconds. If these are HPP path parameters,
+               you MUST pass max_velocity to rescale them.
+        joint_names: ROS2 joint names in order.
+        controller_topic: FollowJointTrajectory action topic.
+        max_velocity: Rescale times so no joint moves faster than this (rad/s).
+            Required when times are raw HPP path parameters.
+        max_acceleration: Max joint acceleration for rescaling (rad/s^2, default 0.5).
+        joint_indices: Indices to extract from each waypoint (default: 0..len(joint_names)).
 
     Returns:
-        True if trajectory was accepted by controller
+        True if trajectory executed successfully.
 
     Example:
         # From your HPP script:
@@ -114,7 +131,7 @@ def send_trajectory(
         waypoints = [np.array(path(t)[0]) for t in np.linspace(0, path.length(), 100)]
         times = list(np.linspace(0, path.length(), 100))
 
-        # Execute:
+        # times are path parameters — must rescale:
         send_trajectory(
             waypoints, times,
             joint_names=["shoulder_pan", "shoulder_lift", "elbow", ...],
