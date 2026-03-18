@@ -1,6 +1,6 @@
-# hpp-planning: ROS2 Jazzy + HPP + Gazebo for motion planning
+# hpp-exec: ROS2 Jazzy + HPP + Gazebo for motion planning
 #
-# Build:  docker build --build-arg DOCKER_USER=$(id -u) --build-arg DOCKER_GROUP=$(id -g) -t hpp-planning .
+# Build:  docker build --build-arg DOCKER_USER=$(id -u) --build-arg DOCKER_GROUP=$(id -g) -t hpp-exec .
 # Run:    ./run.sh
 #
 # On first run inside the container:
@@ -59,6 +59,8 @@ RUN apt-get update -y && DEBIAN_FRONTEND=noninteractive apt-get install -qqy \
     ros-jazzy-joint-state-publisher-gui \
     ros-jazzy-xacro \
     python3-yaml \
+    python3-pip \
+ && pip3 install --break-system-packages viser trimesh pycollada \
  && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Create user with host UID/GID to avoid permission issues on mounted volumes

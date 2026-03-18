@@ -8,17 +8,17 @@ Demonstrates send_trajectory() with time parameterization.
 
 Prerequisites:
     # Terminal 1: Launch Gazebo with FR3
-    ./hpp-planning/scripts/launch_gazebo_gripper.sh
+    ./hpp-exec/scripts/launch_gazebo_gripper.sh
 
     # Terminal 2: Run this tutorial
-    docker exec -it hpp-planning bash
-    python3 ~/devel/hpp-planning/tutorial/tutorial_gazebo.py
+    docker exec -it hpp-exec bash
+    python3 ~/devel/hpp-exec/tutorial/tutorial_gazebo.py
 """
 
 import sys
 import numpy as np
 
-from hpp_planner import send_trajectory
+from hpp_exec import send_trajectory
 
 
 FR3_JOINTS = [
@@ -70,7 +70,7 @@ def main():
 
         if not success:
             print("  FAILED - is Gazebo running?")
-            print("  Launch with: ./hpp-planning/scripts/launch_gazebo_gripper.sh")
+            print("  Launch with: ./hpp-exec/scripts/launch_gazebo_gripper.sh")
             return 1
 
         print(f"  Done.")

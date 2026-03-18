@@ -16,13 +16,13 @@ Prerequisites:
     ./scripts/launch_gazebo_gripper.sh   (in terminal 1)
 
 Usage (in terminal 2):
-    PYTHONPATH=$HOME/devel/hpp-planning:$PYTHONPATH python3 ~/devel/hpp-planning/scripts/test_gripper_gazebo.py
+    PYTHONPATH=$HOME/devel/hpp-exec:$PYTHONPATH python3 ~/devel/hpp-exec/scripts/test_gripper_gazebo.py
 """
 
 import sys
 import numpy as np
 
-from hpp_planner.gripper import (
+from hpp_exec.gripper import (
     execute_manipulation,
     extract_grasp_transitions,
     JointTrajectoryGripperController,

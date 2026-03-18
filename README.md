@@ -1,15 +1,15 @@
-# hpp-planning
+# hpp-exec
 
 ROS2 execution utilities for HPP-generated trajectories.
 
 ## Overview
 
-You write your HPP planning script using `pyhpp` directly, then use `hpp_planner` to send the trajectory to `ros2_control`.
+You write your HPP planning script using `pyhpp` directly, then use `hpp_exec` to send the trajectory to `ros2_control`.
 
 ```python
 from pyhpp.pinocchio import Device, urdf
 from pyhpp.core import Problem, BiRRTPlanner
-from hpp_planner import send_trajectory
+from hpp_exec import send_trajectory
 
 # Your HPP planning script...
 robot = Device("ur5")
@@ -30,7 +30,7 @@ send_trajectory(
 ### Docker (recommended)
 
 ```bash
-cd hpp-planning
+cd hpp-exec
 ./run.sh
 
 # First time inside container:
@@ -40,7 +40,7 @@ cd ~/devel/src && make all
 ### API
 
 ```python
-from hpp_planner import send_trajectory, waypoints_to_joint_trajectory
+from hpp_exec import send_trajectory, waypoints_to_joint_trajectory
 
 # Main function - send trajectory to ros2_control
 send_trajectory(
@@ -63,11 +63,11 @@ Tutorials use the FR3 robot in Gazebo simulation.
 ```bash
 # Terminal 1: Launch Gazebo with FR3
 ./run.sh
-./hpp-planning/scripts/launch_gazebo_gripper.sh
+./hpp-exec/scripts/launch_gazebo_gripper.sh
 
 # Terminal 2: Run tutorial
-docker exec -it hpp-planning bash
-python3 ~/devel/hpp-planning/tutorial/tutorial_gazebo.py
+docker exec -it hpp-exec bash
+python3 ~/devel/hpp-exec/tutorial/tutorial_gazebo.py
 ```
 
 See [tutorial/README.md](tutorial/README.md) for all tutorials.
@@ -75,8 +75,8 @@ See [tutorial/README.md](tutorial/README.md) for all tutorials.
 ## Structure
 
 ```
-hpp-planning/
-├── hpp_planner/           # Python package
+hpp-exec/
+├── hpp_exec/           # Python package
 │   ├── __init__.py
 │   ├── trajectory_utils.py # HPP config → ROS2 JointTrajectory conversion
 │   ├── ros2_sender.py     # send_trajectory() via FollowJointTrajectory action

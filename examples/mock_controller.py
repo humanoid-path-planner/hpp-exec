@@ -14,7 +14,7 @@ Usage:
 
     # Terminal 3: Send trajectory
     python3 -c "
-    from hpp_planner import send_trajectory
+    from hpp_exec import send_trajectory
     import numpy as np
 
     waypoints = [np.array([0,0,0,0,0,0]), np.array([1,0.5,-0.5,1,-1,0.5])]

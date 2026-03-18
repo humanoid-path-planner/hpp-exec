@@ -4,7 +4,7 @@ Send trajectories to ros2_control.
 Simple API for executing HPP-generated trajectories on ROS2 robots.
 
 Example:
-    from hpp_planner import send_trajectory
+    from hpp_exec import send_trajectory
 
     # Your HPP script generates waypoints...
     waypoints = [np.array([0, 0, 0, 0, 0, 0]), np.array([1, 1, 1, 1, 1, 1])]
@@ -25,7 +25,7 @@ from rclpy.node import Node
 from rclpy.action import ActionClient
 from control_msgs.action import FollowJointTrajectory
 
-from hpp_planner.trajectory_utils import (
+from hpp_exec.trajectory_utils import (
     waypoints_to_joint_trajectory,
     add_time_parameterization,
 )

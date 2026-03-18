@@ -5,7 +5,7 @@ All tutorials use the FR3 robot in Gazebo simulation.
 ## Setup
 
 ```bash
-cd ~/devel/hpp-planning
+cd ~/devel/hpp-exec
 ./run.sh --rebuild   # first time only, to build the Docker image
 ./run.sh             # start the container
 
@@ -19,27 +19,27 @@ Send a multi-pose trajectory to the FR3 arm in Gazebo. No HPP needed.
 
 ```bash
 # Terminal 1: Launch Gazebo
-./hpp-planning/scripts/launch_gazebo_gripper.sh
+./hpp-exec/scripts/launch_gazebo_gripper.sh
 
 # Terminal 2: Run tutorial
-docker exec -it hpp-planning bash
-python3 ~/devel/hpp-planning/tutorial/tutorial_gazebo.py
+docker exec -it hpp-exec bash
+python3 ~/devel/hpp-exec/tutorial/tutorial_gazebo.py
 ```
 
 ## Pick-and-Place with HPP Manipulation Planning
 
 Full pipeline: HPP plans a pick-and-place with constraint graph, then
-hpp_planner sends arm trajectories and gripper commands to Gazebo.
+hpp_exec sends arm trajectories and gripper commands to Gazebo.
 
 Requires HPP to be built (`cd ~/devel/src && make all`).
 
 ```bash
 # Terminal 1: Launch Gazebo
-./hpp-planning/scripts/launch_gazebo_gripper.sh
+./hpp-exec/scripts/launch_gazebo_gripper.sh
 
 # Terminal 2: Run manipulation tutorial
-docker exec -it hpp-planning bash
-python3 ~/devel/hpp-planning/tutorial/tutorial_manipulation.py
+docker exec -it hpp-exec bash
+python3 ~/devel/hpp-exec/tutorial/tutorial_manipulation.py
 ```
 
 What it does:
@@ -55,17 +55,17 @@ Test gripper coordination with hardcoded trajectories (no HPP needed).
 
 ```bash
 # Terminal 1: Launch Gazebo
-./hpp-planning/scripts/launch_gazebo_gripper.sh
+./hpp-exec/scripts/launch_gazebo_gripper.sh
 
 # Terminal 2: Run gripper test
-docker exec -it hpp-planning bash
-python3 ~/devel/hpp-planning/scripts/test_gripper_gazebo.py
+docker exec -it hpp-exec bash
+python3 ~/devel/hpp-exec/scripts/test_gripper_gazebo.py
 ```
 
 ## API Overview
 
 ```python
-from hpp_planner import send_trajectory, execute_manipulation
+from hpp_exec import send_trajectory, execute_manipulation
 
 # Simple trajectory (no gripper)
 send_trajectory(waypoints, times, joint_names=JOINTS, max_velocity=1.0)

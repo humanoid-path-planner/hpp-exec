@@ -1,23 +1,17 @@
 #!/usr/bin/env python3
 """
-FR3 Pick-and-Place with HPP Manipulation Planning
-==================================================
+FR3 Pick-and-Place — HPP Manipulation Planning
+===============================================
 
-Full pipeline: HPP plans a pick-and-place trajectory using the constraint
-graph, then hpp_planner sends arm segments and gripper commands to Gazebo.
+Sets up and solves an HPP manipulation problem: FR3 picks a cube
+from position A and places it at position B.
 
-The FR3 picks up a cube from position A and places it at position B.
+Run standalone to plan and inspect the result:
+    python3 ~/devel/hpp-exec/tutorial/tutorial_manipulation.py
 
-Prerequisites:
-    # Build HPP (first time only)
-    cd ~/devel/src && make all
-
-    # Terminal 1: Launch Gazebo
-    ./hpp-planning/scripts/launch_gazebo_gripper.sh
-
-    # Terminal 2: Run this tutorial
-    docker exec -it hpp-planning bash
-    python3 ~/devel/hpp-planning/tutorial/tutorial_manipulation.py
+Or import from another script to access the path, robot, and graph:
+    from tutorial_manipulation import plan_pick_and_place
+    robot, problem, cg, path = plan_pick_and_place()
 """
 
 import os
@@ -38,7 +32,6 @@ from pyhpp.manipulation import (
 )
 from pyhpp.manipulation.constraint_graph_factory import ConstraintGraphFactory
 from pyhpp.core import Dichotomy, Straight
-
 from pyhpp.constraints import (
     Transformation,
     ComparisonTypes,
@@ -47,15 +40,6 @@ from pyhpp.constraints import (
     LockedJoint,
 )
 
-from hpp_planner import execute_manipulation
-from hpp_planner.gripper import (
-    JointTrajectoryGripperController,
-    extract_grasp_transitions,
-)
-
-
-# ---------------------------------------------------------------------------
-# File paths
 # ---------------------------------------------------------------------------
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_DIR = os.path.dirname(SCRIPT_DIR)
@@ -71,52 +55,43 @@ FR3_ARM_JOINTS = [
 ]
 
 
-def setup_problem():
-    """Set up the HPP manipulation planning problem."""
+def plan_pick_and_place():
+    """Plan a pick-and-place trajectory.
 
-    print("Loading FR3 robot and cube...")
+    Returns (robot, problem, cg, path) where path is the solved HPP path,
+    or None if planning failed.
+    """
+
+    print("Loading FR3 + cube...")
     robot = Device("fr3-cube")
-
-    # Load FR3 arm (fixed base)
     urdf.loadModel(robot, 0, "fr3", "anchor", FR3_URDF, FR3_SRDF, SE3.Identity())
 
-    # Load cube as a freeflyer object (can be moved in space)
-    cube_pose = SE3(Quaternion(1, 0, 0, 0), np.array([0.5, 0.0, 0.02]))
+    # Load cube at origin (like ur3-spheres)
+    cube_pose = SE3(rotation=np.identity(3), translation=np.array([0, 0, 0]))
     urdf.loadModel(robot, 0, "cube", "freeflyer", CUBE_URDF, CUBE_SRDF, cube_pose)
-
-    # Set bounds for the cube freeflyer joint (x, y, z, qx, qy, qz, qw)
     robot.setJointBounds("cube/root_joint", [
-        -1.0, 1.0,     # x
-        -1.0, 1.0,     # y
-        -0.01, 1.0,    # z (above ground)
-        -1.001, 1.001,  # qx
-        -1.001, 1.001,  # qy
-        -1.001, 1.001,  # qz
-        -1.001, 1.001,  # qw
+        -1.0, 1.0, -1.0, 1.0, -0.1, 1.0,
+        -1.0001, 1.0001, -1.0001, 1.0001, -1.0001, 1.0001, -1.0001, 1.0001,
     ])
+    print(f"  Config size: {robot.configSize()}")
 
-    print(f"  Device: {robot.name()}, config size: {robot.configSize()}")
-    print(f"  Grippers: {list(robot.grippers().keys())}")
-    print(f"  Handles: {list(robot.handles().keys())}")
-
-    # --- Problem and constraint graph ---
+    # --- Constraint graph ---
     problem = Problem(robot)
-    graph = Graph("graph", robot, problem)
-    graph.maxIterations(40)
-    graph.errorThreshold(0.0001)
+    cg = Graph("graph", robot, problem)
+    constraints = dict()
 
-    # --- Placement constraints ---
-    # The cube must stay on the ground (z = 0.02, half the cube height)
-    constraints = {}
+    # Handle mask (as ur3-spheres does)
+    h = robot.handles()["cube/handle"]
+    h.mask = [True, True, True, False, True, True]
 
-    cube_on_ground = SE3(Quaternion(1, 0, 0, 0), np.array([0, 0, 0.02]))
-    joint_id = robot.model().getJointId("cube/root_joint")
+    # Placement constraints: cube on table at z=0.02 (half of 4cm cube)
+    Id = SE3.Identity()
+    cubePlacement = SE3(Quaternion(1, 0, 0, 0), np.array([0, 0, 0.02]))
+    cube_joint = robot.model().getJointId("cube/root_joint")
 
-    # Placement: constrain z, roll, pitch (cube stays flat on ground)
     pc = Transformation(
-        "place_cube", robot, joint_id,
-        SE3.Identity(), cube_on_ground,
-        [False, False, True, True, True, False],  # z, rx, ry constrained
+        "place_cube", robot, cube_joint, Id, cubePlacement,
+        [False, False, True, True, True, False],
     )
     cts = ComparisonTypes()
     cts[:] = (
@@ -126,23 +101,20 @@ def setup_problem():
     )
     constraints["place_cube"] = Implicit(pc, cts, [True, True, True])
 
-    # Placement complement: x, y, yaw (cube can slide on ground)
-    pc_comp = Transformation(
-        "place_cube/complement", robot, joint_id,
-        SE3.Identity(), cube_on_ground,
-        [True, True, False, False, False, True],  # x, y, rz
+    # Complement: x, y, rotz free
+    pc = Transformation(
+        "place_cube/complement", robot, cube_joint, Id, cubePlacement,
+        [True, True, False, False, False, True],
     )
-    cts_comp = ComparisonTypes()
-    cts_comp[:] = (
+    cts[:] = (
         ComparisonType.Equality,
         ComparisonType.Equality,
         ComparisonType.Equality,
     )
-    constraints["place_cube/complement"] = Implicit(pc_comp, cts_comp, [True, True, True])
+    constraints["place_cube/complement"] = Implicit(pc, cts, [True, True, True])
 
-    # Hold: lock cube in place when not grasped
-    cts_hold = ComparisonTypes()
-    cts_hold[:] = (
+    # Hold: LockedJoint
+    cts[:] = (
         ComparisonType.Equality,
         ComparisonType.Equality,
         ComparisonType.EqualToZero,
@@ -150,168 +122,135 @@ def setup_problem():
         ComparisonType.EqualToZero,
         ComparisonType.Equality,
     )
-    constraints["place_cube/hold"] = LockedJoint(
+    ll = LockedJoint(
         robot, "cube/root_joint",
-        np.array([0, 0, 0.02, 0, 0, 0, 1]),  # x, y, z, qx, qy, qz, qw
-        cts_hold,
+        np.array([0, 0, 0.02, 0, 0, 0, 1]),
+        cts,
     )
-
-    graph.registerConstraints(
+    constraints["place_cube/hold"] = ll
+    cg.registerConstraints(
         constraints["place_cube"],
         constraints["place_cube/complement"],
         constraints["place_cube/hold"],
     )
 
-    # --- Build constraint graph using factory ---
-    factory = ConstraintGraphFactory(graph, constraints)
+    # Pre-placement (above table at z=0.1)
+    pc = Transformation(
+        "preplace_cube", robot, cube_joint, Id,
+        SE3(Quaternion(1, 0, 0, 0), np.array([0, 0, 0.1])),
+        [False, False, True, True, True, False],
+    )
+    cts[:] = (
+        ComparisonType.EqualToZero,
+        ComparisonType.EqualToZero,
+        ComparisonType.EqualToZero,
+    )
+    constraints["preplace_cube"] = Implicit(pc, cts, [True, True, True])
+
+    # --- Factory ---
+    cg.maxIterations(40)
+    cg.errorThreshold(0.0001)
+    factory = ConstraintGraphFactory(cg, constraints)
     factory.setGrippers(["fr3/gripper"])
     factory.setObjects(["cube"], [["cube/handle"]], [[]])
     factory.generate()
 
-    # Add placement complement to grasp/release transitions
-    for transition_name in graph.getTransitionNames():
-        if "fr3/gripper > cube/handle" in transition_name:
-            e = graph.getTransition(transition_name)
-            graph.addNumericalConstraintsToTransition(
-                e, [constraints["place_cube/complement"]]
-            )
-        if "fr3/gripper < cube/handle" in transition_name:
-            e = graph.getTransition(transition_name)
-            graph.addNumericalConstraintsToTransition(
-                e, [constraints["place_cube/complement"]]
-            )
+    # Complement on preplace↔grasps transitions (same as ur3-spheres)
+    try:
+        e = cg.getTransition("fr3/gripper > cube/handle | f_23")
+        cg.addNumericalConstraintsToTransition(
+            e, [constraints["place_cube/complement"]])
+    except RuntimeError:
+        pass
+    try:
+        e = cg.getTransition("fr3/gripper < cube/handle | 0-0_32")
+        cg.addNumericalConstraintsToTransition(
+            e, [constraints["place_cube/complement"]])
+    except RuntimeError:
+        pass
 
-    # --- Steering and path validation ---
     problem.steeringMethod = Straight(problem)
-    problem.pathValidation = Dichotomy(robot, 0.0)
+    problem.pathValidation = Dichotomy(robot, 0)
     problem.pathProjector = ProgressiveProjector(
-        problem.distance(), problem.steeringMethod, 0.01,
-    )
+        problem.distance(), problem.steeringMethod, 0.01)
 
-    graph.initialize()
-    problem.constraintGraph(graph)
+    cg.initialize()
+    print(f"  States: {cg.getStateNames()}")
+    print(f"  Transitions: {len(cg.getTransitionNames())}")
 
-    return robot, problem, graph
-
-
-def plan_pick_and_place(problem, graph):
-    """Plan a pick-and-place trajectory."""
-
-    # FR3 config (7 DOF) + finger (1 DOF) + cube freeflyer (7 DOF) = 15 DOF
-    # Note: fr3_finger_joint2 is a mimic joint, not in the config
-
-    # Initial config: arm at ready pose, cube at position A
+    # --- Configs ---
+    # FR3 arm (7) + fingers (2) + cube freeflyer (7) = 16
     q_init = np.array([
-        # FR3 arm (7 joints)
-        0.0, -0.785, 0.0, -2.356, 0.0, 1.571, 0.785,
-        # FR3 finger
-        0.035,
-        # Cube pose (x, y, z, qx, qy, qz, qw)
-        0.5, 0.0, 0.02, 0.0, 0.0, 0.0, 1.0,
+        0.0, -pi/4, 0.0, -3*pi/4, 0.0, pi/2, pi/4,   # arm (ready)
+        0.035, 0.035,                                    # fingers
+        0.5, 0.0, 0.02, 0.0, 0.0, 0.0, 1.0,            # cube at A
     ])
-
-    # Goal config: arm at ready pose, cube at position B
     q_goal = np.array([
-        # FR3 arm (same ready pose)
-        0.0, -0.785, 0.0, -2.356, 0.0, 1.571, 0.785,
-        # FR3 finger
-        0.035,
-        # Cube at new position
-        0.3, 0.3, 0.02, 0.0, 0.0, 0.0, 1.0,
+        0.0, -pi/4, 0.0, -3*pi/4, 0.0, pi/2, pi/4,   # arm (ready)
+        0.035, 0.035,                                    # fingers
+        0.3, 0.3, 0.02, 0.0, 0.0, 0.0, 1.0,            # cube at B
     ])
 
     problem.initConfig(q_init)
-    problem.resetGoalConfigs()
     problem.addGoalConfig(q_goal)
+    problem.constraintGraph(cg)
 
+    # --- Solve ---
     planner = ManipulationPlanner(problem)
     planner.maxIterations(5000)
 
-    print("\nPlanning pick-and-place trajectory...")
+    print("\nPlanning...")
     start = time.time()
     path = planner.solve()
 
     if path is None:
-        print("  Planning FAILED")
-        return None, None
+        print("  FAILED")
+        return robot, problem, cg, None
 
     elapsed = time.time() - start
     print(f"  Solved in {elapsed:.1f}s, path length: {path.length():.3f}")
+    return robot, problem, cg, path
 
-    # Sample waypoints from the path
-    n_samples = max(int(path.length() / 0.02), 50)
-    waypoints = []
+
+def extract_waypoints(path, n_per_unit=50):
+    """Sample waypoints from an HPP path.
+
+    Returns (full_waypoints, arm_waypoints, times) where:
+    - full_waypoints: list of full config vectors (16 DOF)
+    - arm_waypoints: list of arm-only configs (7 DOF)
+    - times: list of path parameter values
+    """
+    n_samples = max(int(path.length() * n_per_unit), 50)
+    full_waypoints = []
+    arm_waypoints = []
     times = []
-
     for i in range(n_samples + 1):
         t = (i / n_samples) * path.length()
         q, success = path(t)
         if success:
-            waypoints.append(np.array(q))
+            full_waypoints.append(np.array(q))
+            arm_waypoints.append(np.array(q[:7]))
             times.append(t)
-
-    print(f"  Extracted {len(waypoints)} waypoints")
-
-    return waypoints, times
-
-
-def execute_on_gazebo(waypoints, times, graph):
-    """Send the planned trajectory to Gazebo with gripper coordination."""
-
-    # Preview grasp transitions
-    transitions = extract_grasp_transitions(waypoints, times, graph)
-    print(f"\nGrasp transitions found: {len(transitions)}")
-    for t in transitions:
-        action = "CLOSE" if t.acquired else "OPEN"
-        print(f"  t={t.time:.2f}s (waypoint {t.waypoint_index}): {action}")
-
-    # Setup gripper controller (FR3 finger via JointTrajectoryController)
-    gripper = JointTrajectoryGripperController(
-        topic="/gripper_controller/follow_joint_trajectory",
-        joint_names=["fr3_finger_joint1"],
-        open_positions=[0.04],
-        close_positions=[0.0],
-        duration=1.0,
-    )
-
-    # FR3 arm joint indices in the HPP config vector
-    # Config layout: [arm(0-6), finger(7), cube_freeflyer(8-14)]
-    arm_indices = list(range(7))
-
-    print("\nExecuting on Gazebo...")
-    success = execute_manipulation(
-        waypoints, times,
-        arm_joint_names=FR3_ARM_JOINTS,
-        arm_joint_indices=arm_indices,
-        gripper_controller=gripper,
-        graph=graph,
-        max_velocity=0.3,  # slow for visibility
-    )
-
-    gripper.destroy()
-    return success
+    return full_waypoints, arm_waypoints, times
 
 
 def main():
-    print("=" * 60)
-    print("FR3 Pick-and-Place: HPP Planning + Gazebo Execution")
-    print("=" * 60)
-
     for f in [FR3_URDF, FR3_SRDF, CUBE_URDF, CUBE_SRDF]:
         if not os.path.exists(f):
-            print(f"Missing file: {f}")
+            print(f"Missing: {f}")
             return 1
 
-    robot, problem, graph = setup_problem()
-    waypoints, times = plan_pick_and_place(problem, graph)
+    robot, problem, cg, path = plan_pick_and_place()
 
-    if waypoints is None:
+    if path is None:
         return 1
 
-    success = execute_on_gazebo(waypoints, times, graph)
+    full_wp, arm_wp, times = extract_waypoints(path)
+    print(f"  {len(arm_wp)} waypoints extracted")
+    print(f"  Start cube pos: {full_wp[0][9:12]}")
+    print(f"  End cube pos:   {full_wp[-1][9:12]}")
 
-    print(f"\nResult: {'SUCCESS' if success else 'FAILED'}")
-    return 0 if success else 1
+    return 0
 
 
 if __name__ == "__main__":

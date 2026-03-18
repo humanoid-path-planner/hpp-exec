@@ -5,7 +5,7 @@ Detects grasp/release events from HPP constraint graph state transitions
 and coordinates arm trajectory execution with gripper open/close commands.
 
 Example:
-    from hpp_planner.gripper import (
+    from hpp_exec.gripper import (
         execute_manipulation,
         GripperCommandController,
     )
@@ -40,7 +40,7 @@ from control_msgs.action import FollowJointTrajectory, GripperCommand
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 from builtin_interfaces.msg import Duration
 
-from hpp_planner.trajectory_utils import waypoints_to_joint_trajectory, add_time_parameterization
+from hpp_exec.trajectory_utils import waypoints_to_joint_trajectory, add_time_parameterization
 
 logger = logging.getLogger(__name__)
 
@@ -353,7 +353,7 @@ def execute_manipulation(
     Returns:
         True if all segments and gripper commands succeeded.
     """
-    from hpp_planner.ros2_sender import send_trajectory
+    from hpp_exec.ros2_sender import send_trajectory
 
     # Find all grasp transitions
     transitions = extract_grasp_transitions(waypoints, times, graph)

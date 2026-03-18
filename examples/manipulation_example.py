@@ -19,8 +19,8 @@ Usage with real HPP planning (inside Docker):
 
 import numpy as np
 
-from hpp_planner import execute_manipulation
-from hpp_planner.gripper import (
+from hpp_exec import execute_manipulation
+from hpp_exec.gripper import (
     GripperCommandController,
     extract_grasp_transitions,
 )

@@ -1,4 +1,4 @@
-# hpp-planning Docker environment
+# hpp-exec Docker environment
 # robotpkg provides base HPP C++ deps at /opt/openrobots
 # hpp-manipulation + hpp-python built from source in ~/devel/install (takes priority)
 
@@ -19,19 +19,14 @@ if [ -f /opt/ros/jazzy/setup.bash ]; then
     source /opt/ros/jazzy/setup.bash
 fi
 
-# hpp-planning ROS2 workspace (if built)
-if [ -f $DEVEL_HPP_DIR/ros2_ws/install/setup.bash ]; then
-    source $DEVEL_HPP_DIR/ros2_ws/install/setup.bash
-fi
-
 # Franka Gazebo workspace
 if [ -f /opt/franka_ws/install/setup.bash ]; then
     source /opt/franka_ws/install/setup.bash
 fi
 
-# hpp-planning on PYTHONPATH
-if [ -d $DEVEL_HPP_DIR/hpp-planning ]; then
-    export PYTHONPATH=$DEVEL_HPP_DIR/hpp-planning:$PYTHONPATH
+# hpp-exec on PYTHONPATH
+if [ -d $DEVEL_HPP_DIR/hpp-exec ]; then
+    export PYTHONPATH=$DEVEL_HPP_DIR/hpp-exec:$PYTHONPATH
 fi
 
 export ROS_PACKAGE_PATH=$INSTALL_HPP_DIR/share:$ROBOTPKG/share:${ROS_PACKAGE_PATH:-}

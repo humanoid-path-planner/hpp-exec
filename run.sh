@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Run hpp-planning Docker container.
+# Run hpp-exec Docker container.
 #
 # robotpkg provides base HPP C++ deps. hpp-manipulation and hpp-python are
 # built from source (devel branch) inside a persistent volume.
@@ -15,12 +15,12 @@
 #   ./run.sh --rebuild                    # force rebuild image
 #
 # To open another terminal in the same container:
-#   docker exec -it hpp-planning bash
+#   docker exec -it hpp-exec bash
 #
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-CONTAINER_NAME="hpp-planning"
+CONTAINER_NAME="hpp-exec"
 DOMAIN_ID=0
 REBUILD=false
 
@@ -55,12 +55,12 @@ if [ ! -d "$DEVEL_DIR/install/lib/python3.12/site-packages/pyhpp" ]; then
 fi
 
 # Build image if not exists or --rebuild
-if $REBUILD || ! docker image inspect hpp-planning >/dev/null 2>&1; then
-    echo "Building hpp-planning Docker image..."
+if $REBUILD || ! docker image inspect hpp-exec >/dev/null 2>&1; then
+    echo "Building hpp-exec Docker image..."
     docker build \
         --build-arg DOCKER_USER=$(id -u) \
         --build-arg DOCKER_GROUP=$(id -g) \
-        -t hpp-planning "$SCRIPT_DIR"
+        -t hpp-exec "$SCRIPT_DIR"
 fi
 
 # If container already running, exec into it
@@ -90,11 +90,12 @@ fi
 
 docker run $TTY_FLAG --rm --net host \
     --name "$CONTAINER_NAME" \
+    --privileged \
     $DOCKER_GPU_ARGS \
     $DOCKER_DISPLAY_ARGS \
     -v "$DEVEL_DIR:/home/user/devel" \
-    -v "$SCRIPT_DIR:/home/user/devel/hpp-planning" \
+    -v "$SCRIPT_DIR:/home/user/devel/hpp-exec" \
     -e "ROS_DOMAIN_ID=$DOMAIN_ID" \
     -e "DEVEL_HPP_DIR=/home/user/devel" \
-    hpp-planning \
+    hpp-exec \
     "${@:-bash}"

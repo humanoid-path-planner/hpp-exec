@@ -5,7 +5,7 @@ Example: Franka Emika Research (FER) planning with HPP.
 Usage (in Docker):
     ./run.sh
     cd ~/devel/src && make all  # First time only
-    python3 ~/devel/hpp-planning/examples/fer_example.py
+    python3 ~/devel/hpp-exec/examples/fer_example.py
 """
 
 import os
@@ -92,7 +92,7 @@ def main():
     print(f"Got {len(waypoints)} waypoints")
 
     # Test trajectory conversion
-    from hpp_planner import send_trajectory
+    from hpp_exec import send_trajectory
 
     send_trajectory(
         waypoints, times,

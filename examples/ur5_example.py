@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-Example: UR5 planning with HPP + trajectory execution via hpp_planner.
+Example: UR5 planning with HPP + trajectory execution via hpp_exec.
 
 This script shows the intended workflow:
 1. Use pyhpp directly for motion planning
 2. Extract waypoints from the HPP path
-3. Use hpp_planner utilities to send trajectory to ros2_control
+3. Use hpp_exec utilities to send trajectory to ros2_control
 
 Prerequisites:
     - pyhpp installed (hpp-python native bindings)
@@ -15,7 +15,7 @@ Prerequisites:
 Usage (in Docker):
     ./run.sh
     cd ~/devel/src && make all  # First time only
-    python3 ~/devel/hpp-planning/examples/ur5_example.py
+    python3 ~/devel/hpp-exec/examples/ur5_example.py
 """
 
 import sys
@@ -108,7 +108,7 @@ def plan_with_hpp(q_init: np.ndarray, q_goal: np.ndarray):
 
 def test_trajectory_conversion(waypoints, times):
     """Test trajectory conversion without sending to controller."""
-    from hpp_planner import waypoints_to_joint_trajectory, add_time_parameterization
+    from hpp_exec import waypoints_to_joint_trajectory, add_time_parameterization
 
     # Scale path parameter to real time
     scaled_times = add_time_parameterization(
@@ -133,7 +133,7 @@ def test_trajectory_conversion(waypoints, times):
 
 def main():
     print("=" * 60)
-    print("hpp-planning Example: UR5")
+    print("hpp-exec Example: UR5")
     print("=" * 60)
 
     # Check URDF exists
@@ -165,7 +165,7 @@ def main():
     # Step 3: (Optional) Send to ros2_control
     # Uncomment when running with a real or simulated robot:
     #
-    # from hpp_planner import send_trajectory
+    # from hpp_exec import send_trajectory
     # success = send_trajectory(
     #     waypoints, times,
     #     joint_names=UR5_JOINTS,

@@ -1,10 +1,10 @@
 """
-hpp_planner - ROS2 execution utilities for HPP trajectories.
+hpp_exec - ROS2 execution utilities for HPP trajectories.
 
 Send HPP-generated trajectories to ros2_control.
 
 Example:
-    from hpp_planner import send_trajectory
+    from hpp_exec import send_trajectory
 
     # Your HPP script generates waypoints...
     waypoints = [...]
@@ -20,13 +20,13 @@ Example:
 
 __version__ = "0.1.0"
 
-from hpp_planner.trajectory_utils import (
+from hpp_exec.trajectory_utils import (
     waypoints_to_joint_trajectory,
     add_time_parameterization,
     extract_joint_config,
 )
-from hpp_planner.ros2_sender import send_trajectory, send_trajectory_async
-from hpp_planner.gripper import (
+from hpp_exec.ros2_sender import send_trajectory, send_trajectory_async
+from hpp_exec.gripper import (
     execute_manipulation,
     extract_grasp_transitions,
     GraspTransition,
