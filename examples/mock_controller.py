@@ -17,10 +17,10 @@ Usage:
     from hpp_exec import send_trajectory
     import numpy as np
 
-    waypoints = [np.array([0,0,0,0,0,0]), np.array([1,0.5,-0.5,1,-1,0.5])]
+    configs = [np.array([0,0,0,0,0,0]), np.array([1,0.5,-0.5,1,-1,0.5])]
     times = [0.0, 3.0]
 
-    send_trajectory(waypoints, times,
+    send_trajectory(configs, times,
         joint_names=['shoulder_pan_joint','shoulder_lift_joint','elbow_joint',
                      'wrist_1_joint','wrist_2_joint','wrist_3_joint'],
         max_velocity=0.5)

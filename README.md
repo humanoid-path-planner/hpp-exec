@@ -15,11 +15,11 @@ from hpp_exec import send_trajectory
 robot = Device("ur5")
 urdf.loadModel(robot, ...)
 problem = Problem(robot)
-# ... solve and get waypoints ...
+# ... solve and get configs ...
 
 # Execute on robot
 send_trajectory(
-    waypoints, times,
+    configs, times,
     joint_names=["shoulder_pan_joint", "shoulder_lift_joint", ...],
     max_velocity=1.0,
 )
@@ -40,11 +40,11 @@ cd ~/devel/src && make all
 ### API
 
 ```python
-from hpp_exec import send_trajectory, waypoints_to_joint_trajectory
+from hpp_exec import send_trajectory, configs_to_joint_trajectory
 
 # Main function - send trajectory to ros2_control
 send_trajectory(
-    waypoints,              # List[np.ndarray] from HPP
+    configs,              # List[np.ndarray] from HPP
     times,                  # List[float] path parameter values
     joint_names,            # List[str] ROS2 joint names
     max_velocity=1.0,       # Rescale times to respect velocity limit
@@ -53,24 +53,24 @@ send_trajectory(
 )
 
 # Lower-level conversion
-trajectory = waypoints_to_joint_trajectory(waypoints, times, joint_names)
+trajectory = configs_to_joint_trajectory(configs, times, joint_names)
 ```
 
-## Tutorial
+## Examples
 
-Tutorials use the FR3 robot in Gazebo simulation.
+Examples use the FR3 robot in Gazebo simulation or real hardware.
 
 ```bash
 # Terminal 1: Launch Gazebo with FR3
 ./run.sh
 ./hpp-exec/scripts/launch_gazebo_gripper.sh
 
-# Terminal 2: Run tutorial
+# Terminal 2: Run example
 docker exec -it hpp-exec bash
-python3 ~/devel/hpp-exec/tutorial/tutorial_gazebo.py
+python3 ~/devel/hpp-exec/examples/simple_trajectory.py
 ```
 
-See [tutorial/README.md](tutorial/README.md) for all tutorials.
+See [examples/README.md](examples/README.md) for all examples.
 
 ## Structure
 
@@ -81,10 +81,10 @@ hpp-exec/
 │   ├── trajectory_utils.py # HPP config → ROS2 JointTrajectory conversion
 │   ├── ros2_sender.py     # send_trajectory() via FollowJointTrajectory action
 │   └── gripper.py         # Gripper coordination for manipulation trajectories
-├── scripts/               # Gazebo gripper testing (FR3)
-├── tutorial/              # HPP tutorials
-├── examples/              # Usage examples + mock controller
+├── examples/              # Usage examples (Gazebo + real hardware)
+├── scripts/               # Launch scripts for Gazebo
 ├── robots/                # URDF/SRDF for examples
+├── docs/                  # Architecture documentation
 ├── docker/
 ├── Dockerfile
 └── run.sh

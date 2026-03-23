@@ -13,9 +13,9 @@ Prerequisites:
     # Terminal 1: Launch Gazebo
     ./hpp-exec/scripts/launch_gazebo_gripper.sh
 
-    # Terminal 2: Run this tutorial
+    # Terminal 2: Run
     docker exec -it hpp-exec bash
-    python3 ~/devel/hpp-exec/tutorial/tutorial_hpp_gazebo.py
+    python3 ~/devel/hpp-exec/examples/hpp_planning_gazebo.py
 """
 
 import os
@@ -92,21 +92,21 @@ def main():
     elapsed = time.time() - start
     print(f"  Solved in {elapsed:.1f}s, path length: {path.length():.3f}")
 
-    # --- Extract waypoints ---
+    # --- Extract configs ---
     n_samples = max(int(path.length() / 0.02), 50)
-    waypoints = []
+    configs = []
     times = []
     for i in range(n_samples + 1):
         t = (i / n_samples) * path.length()
         q, success = path(t)
         if success:
             # Extract arm joints only (indices 0-6), skip fingers
-            waypoints.append(np.array(q[:7]))
+            configs.append(np.array(q[:7]))
             times.append(t)
 
-    print(f"  Extracted {len(waypoints)} waypoints")
-    print(f"  Start: {waypoints[0]}")
-    print(f"  End:   {waypoints[-1]}")
+    print(f"  Extracted {len(configs)} configs")
+    print(f"  Start: {configs[0]}")
+    print(f"  End:   {configs[-1]}")
 
     if plan_only:
         print("\n--plan-only: skipping Gazebo execution")
@@ -115,7 +115,7 @@ def main():
     # --- Send to Gazebo ---
     print("\nSending to Gazebo...")
     success = send_trajectory(
-        waypoints, times,
+        configs, times,
         joint_names=FR3_ARM_JOINTS,
         max_velocity=0.5,
     )

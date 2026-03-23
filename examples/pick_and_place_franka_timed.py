@@ -1,21 +1,24 @@
 #!/usr/bin/env python3
 """
-FR3 Pick-and-Place — HPP Manipulation Planning
-===============================================
+FR3 Pick-and-Place — Real Hardware with HPP Time Parameterization
+=================================================================
 
-Sets up and solves an HPP manipulation problem: FR3 picks a cube
-from position A and places it at position B.
+Self-contained script: plans a pick-and-place with HPP manipulation,
+applies SimpleTimeParameterization for dynamically-feasible timing,
+then executes on a real FR3 with Franka gripper actions.
 
-Run standalone to plan and inspect the result:
-    python3 ~/devel/hpp-exec/tutorial/tutorial_manipulation.py
+This means the path parameter IS real time (seconds), so we bypass
+hpp-exec's simple time scaling entirely.
 
-Or import from another script to access the path, robot, and graph:
-    from tutorial_manipulation import plan_pick_and_place
-    robot, problem, cg, path = plan_pick_and_place()
+Prerequisites:
+    # Launch franka_ros2 with real robot
+    ros2 launch franka_bringup franka.launch.py robot_ip:=<ROBOT_IP> arm_id:=fr3
+
+    # Run this script
+    python3 pick_and_place_franka_timed.py
 """
 
 import os
-import sys
 import time
 from math import pi
 
@@ -31,7 +34,7 @@ from pyhpp.manipulation import (
     ManipulationPlanner,
 )
 from pyhpp.manipulation.constraint_graph_factory import ConstraintGraphFactory
-from pyhpp.core import Dichotomy, Straight
+from pyhpp.core import Dichotomy, Straight, SimpleTimeParameterization
 from pyhpp.constraints import (
     Transformation,
     ComparisonTypes,
@@ -39,6 +42,10 @@ from pyhpp.constraints import (
     Implicit,
     LockedJoint,
 )
+
+from hpp_exec import execute_segments
+from hpp_exec.gripper import segments_from_graph, extract_grasp_transitions
+from gripper_controllers import FrankaGripperController
 
 # ---------------------------------------------------------------------------
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -55,18 +62,48 @@ FR3_ARM_JOINTS = [
 ]
 
 
+def extract_configs_timed(path, dt=0.02):
+    """Sample configs from a time-parameterized HPP path.
+
+    Since path.length() is already in seconds, we sample at a fixed
+    timestep (default 50 Hz to match typical ROS2 control rates).
+
+    Returns:
+        (full_configs, arm_configs, times) where times are real seconds.
+    """
+    duration = path.length()
+    n_samples = max(int(duration / dt), 2)
+
+    full_configs = []
+    arm_configs = []
+    times = []
+
+    for i in range(n_samples + 1):
+        t = min((i / n_samples) * duration, duration)
+        q, success = path(t)
+        if success:
+            full_configs.append(np.array(q))
+            arm_configs.append(np.array(q[:7]))
+            times.append(t)
+
+    return full_configs, arm_configs, times
+
+
 def plan_pick_and_place():
     """Plan a pick-and-place trajectory.
 
     Returns (robot, problem, cg, path) where path is the solved HPP path,
     or None if planning failed.
     """
+    for f in [FR3_URDF, FR3_SRDF, CUBE_URDF, CUBE_SRDF]:
+        if not os.path.exists(f):
+            print(f"Missing: {f}")
+            return None, None, None, None
 
     print("Loading FR3 + cube...")
     robot = Device("fr3-cube")
     urdf.loadModel(robot, 0, "fr3", "anchor", FR3_URDF, FR3_SRDF, SE3.Identity())
 
-    # Load cube at origin (like ur3-spheres)
     cube_pose = SE3(rotation=np.identity(3), translation=np.array([0, 0, 0]))
     urdf.loadModel(robot, 0, "cube", "freeflyer", CUBE_URDF, CUBE_SRDF, cube_pose)
     robot.setJointBounds("cube/root_joint", [
@@ -80,7 +117,6 @@ def plan_pick_and_place():
     cg = Graph("graph", robot, problem)
     constraints = dict()
 
-    # Handle mask (as ur3-spheres does)
     h = robot.handles()["cube/handle"]
     h.mask = [True, True, True, False, True, True]
 
@@ -155,7 +191,7 @@ def plan_pick_and_place():
     factory.setObjects(["cube"], [["cube/handle"]], [[]])
     factory.generate()
 
-    # Complement on preplace↔grasps transitions (same as ur3-spheres)
+    # Complement on preplace↔grasps transitions
     try:
         e = cg.getTransition("fr3/gripper > cube/handle | f_23")
         cg.addNumericalConstraintsToTransition(
@@ -212,51 +248,69 @@ def plan_pick_and_place():
     return robot, problem, cg, path
 
 
-def extract_waypoints(path, n_per_unit=50):
-    """Sample waypoints from an HPP path.
-
-    Returns (full_waypoints, arm_waypoints, times) where:
-    - full_waypoints: list of full config vectors (16 DOF)
-    - arm_waypoints: list of arm-only configs (7 DOF)
-    - times: list of path parameter values
-    """
-    n_samples = max(int(path.length() * n_per_unit), 50)
-    full_waypoints = []
-    arm_waypoints = []
-    times = []
-    for i in range(n_samples + 1):
-        t = (i / n_samples) * path.length()
-        q, success = path(t)
-        if success:
-            full_waypoints.append(np.array(q))
-            arm_waypoints.append(np.array(q[:7]))
-            times.append(t)
-    return full_waypoints, arm_waypoints, times
-
-
 def main():
-    for f in [FR3_URDF, FR3_SRDF, CUBE_URDF, CUBE_SRDF]:
-        if not os.path.exists(f):
-            print(f"Missing: {f}")
-            return 1
-
+    # --- Plan ---
     robot, problem, cg, path = plan_pick_and_place()
-
     if path is None:
         return 1
 
-    full_wp, arm_wp, times = extract_waypoints(path)
-    print(f"  {len(arm_wp)} waypoints extracted")
-    print(f"  Start cube pos: {full_wp[0][9:12]}")
-    print(f"  End cube pos:   {full_wp[-1][9:12]}")
+    print(f"\nRaw path length (geometric): {path.length():.3f}")
 
-    return 0
+    # --- Time parameterization via HPP ---
+    # Order 2 = 5th-order polynomial: zero velocity AND acceleration
+    # at segment boundaries → smoothest motion.
+    problem.setParameter("SimpleTimeParameterization/order", 2)
+    problem.setParameter("SimpleTimeParameterization/maxAcceleration", 1.0)
+    # safety < 1.0 scales down velocities (0.5 = use 50% of joint limits)
+    problem.setParameter("SimpleTimeParameterization/safety", 0.5)
+
+    optimizer = SimpleTimeParameterization(problem)
+    timed_path = optimizer.optimize(path)
+
+    duration = timed_path.length()
+    print(f"Time-parameterized duration: {duration:.2f}s")
+
+    # --- Sample configs (times are now real seconds) ---
+    full_configs, arm_configs, times = extract_configs_timed(timed_path, dt=0.02)
+    print(f"Sampled {len(full_configs)} configs at 50 Hz")
+
+    # --- Log transitions ---
+    transitions = extract_grasp_transitions(full_configs, times, cg)
+    print(f"\nGrasp transitions: {len(transitions)}")
+    for t in transitions:
+        action = "GRASP" if t.acquired else "RELEASE"
+        print(f"  t={t.time:.2f}s (config {t.config_index}): {action}")
+
+    # --- Franka gripper (real hardware) ---
+    gripper = FrankaGripperController(
+        arm_id="fr3",
+        open_width=0.08,
+        grasp_width=0.02,
+        grasp_force=50.0,
+        grasp_speed=0.05,
+    )
+
+    # --- Build segments from constraint graph ---
+    segments = segments_from_graph(
+        full_configs, times, cg,
+        on_grasp=gripper.close,
+        on_release=gripper.open,
+    )
+
+    # --- Execute ---
+    print(f"\nExecuting {len(segments)} segments on real FR3...")
+    success = execute_segments(
+        segments, full_configs, times,
+        joint_names=FR3_ARM_JOINTS,
+        joint_indices=list(range(7)),
+        max_velocity=None,  # times already in seconds from HPP
+    )
+
+    gripper.destroy()
+
+    print(f"\nResult: {'SUCCESS' if success else 'FAILED'}")
+    return 0 if success else 1
 
 
 if __name__ == "__main__":
-    robot, problem, cg, path = plan_pick_and_place()
-    if path is not None:
-        full_wp, arm_wp, times = extract_waypoints(path)
-        print(f"  {len(arm_wp)} waypoints extracted")
-        print(f"  Start cube pos: {full_wp[0][9:12]}")
-        print(f"  End cube pos:   {full_wp[-1][9:12]}")
+    main()

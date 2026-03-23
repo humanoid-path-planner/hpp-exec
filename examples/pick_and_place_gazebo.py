@@ -3,7 +3,7 @@
 FR3 Pick-and-Place — Gazebo Execution
 ======================================
 
-Imports the HPP manipulation plan from tutorial_manipulation.py
+Imports the HPP manipulation plan from pick_and_place_planning.py
 and sends it to Gazebo with gripper coordination.
 
 Prerequisites:
@@ -12,21 +12,17 @@ Prerequisites:
 
     # Terminal 2: Run
     docker exec -it hpp-exec bash
-    python3 ~/devel/hpp-exec/tutorial/tutorial_manipulation_gazebo.py
+    python3 ~/devel/hpp-exec/examples/pick_and_place_gazebo.py
 """
 
-import sys
-
-from tutorial_manipulation import (
+from pick_and_place_planning import (
     plan_pick_and_place,
-    extract_waypoints,
+    extract_configs,
     FR3_ARM_JOINTS,
 )
-from hpp_exec import execute_manipulation
-from hpp_exec.gripper import (
-    JointTrajectoryGripperController,
-    extract_grasp_transitions,
-)
+from hpp_exec import execute_segments
+from hpp_exec.gripper import segments_from_graph, extract_grasp_transitions
+from gripper_controllers import JointTrajectoryGripperController
 
 
 def main():
@@ -35,16 +31,16 @@ def main():
     if path is None:
         return 1
 
-    full_wp, arm_wp, times = extract_waypoints(path)
+    full_configs, arm_configs, times = extract_configs(path)
 
-    # --- Detect grasp transitions ---
-    transitions = extract_grasp_transitions(full_wp, times, cg)
+    # --- Detect grasp transitions (for logging) ---
+    transitions = extract_grasp_transitions(full_configs, times, cg)
     print(f"\nGrasp transitions: {len(transitions)}")
     for t in transitions:
         action = "CLOSE" if t.acquired else "OPEN"
-        print(f"  t={t.time:.2f}s (wp {t.waypoint_index}): {action}")
+        print(f"  t={t.time:.2f}s (config {t.config_index}): {action}")
 
-    # --- Gripper controller ---
+    # --- Gripper controller (FR3-specific) ---
     gripper = JointTrajectoryGripperController(
         topic="/gripper_controller/follow_joint_trajectory",
         joint_names=["fr3_finger_joint1"],
@@ -53,15 +49,19 @@ def main():
         duration=1.0,
     )
 
+    # --- Build segments from constraint graph ---
+    segments = segments_from_graph(
+        full_configs, times, cg,
+        on_grasp=gripper.close,
+        on_release=gripper.open,
+    )
+
     # --- Execute ---
-    print("\nExecuting on Gazebo...")
-    arm_indices = list(range(7))
-    success = execute_manipulation(
-        full_wp, times,
-        arm_joint_names=FR3_ARM_JOINTS,
-        arm_joint_indices=arm_indices,
-        gripper_controller=gripper,
-        graph=cg,
+    print(f"\nExecuting {len(segments)} segments on Gazebo...")
+    success = execute_segments(
+        segments, full_configs, times,
+        joint_names=FR3_ARM_JOINTS,
+        joint_indices=list(range(7)),
         max_velocity=0.3,
     )
 

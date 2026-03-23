@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-FR3 Gazebo Tutorial
-===================
+FR3 Simple Trajectory
+=====================
 
 Send a simple trajectory to the FR3 robot in Gazebo simulation.
 Demonstrates send_trajectory() with time parameterization.
@@ -10,9 +10,9 @@ Prerequisites:
     # Terminal 1: Launch Gazebo with FR3
     ./hpp-exec/scripts/launch_gazebo_gripper.sh
 
-    # Terminal 2: Run this tutorial
+    # Terminal 2: Run
     docker exec -it hpp-exec bash
-    python3 ~/devel/hpp-exec/tutorial/tutorial_gazebo.py
+    python3 ~/devel/hpp-exec/examples/simple_trajectory.py
 """
 
 import sys
@@ -34,13 +34,13 @@ POSE_B = np.array([-0.5, -0.3, -0.3, -1.5, -0.2, 1.2, -0.5])
 
 def interpolate(start, end, n_points=30):
     """Linear interpolation between two configurations."""
-    waypoints = []
+    configs = []
     times = []
     for i in range(n_points):
         t = i / (n_points - 1)
-        waypoints.append(start + t * (end - start))
+        configs.append(start + t * (end - start))
         times.append(t)  # path parameter, not real time
-    return waypoints, times
+    return configs, times
 
 
 def main():
@@ -56,14 +56,14 @@ def main():
     ]
 
     for name, start, end in segments:
-        waypoints, times = interpolate(start, end, n_points=30)
+        configs, times = interpolate(start, end, n_points=30)
 
-        print(f"\n  {name} ({len(waypoints)} waypoints)...")
+        print(f"\n  {name} ({len(configs)} configs)...")
 
         # times are path parameters (0 to 1), NOT real seconds.
         # max_velocity rescales them to respect joint velocity limits.
         success = send_trajectory(
-            waypoints, times,
+            configs, times,
             joint_names=FR3_JOINTS,
             max_velocity=0.5,
         )
