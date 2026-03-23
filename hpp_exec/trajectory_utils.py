@@ -9,8 +9,8 @@ from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 from builtin_interfaces.msg import Duration
 
 
-def waypoints_to_joint_trajectory(
-    waypoints: List[np.ndarray],
+def configs_to_joint_trajectory(
+    configs: List[np.ndarray],
     times: List[float],
     joint_names: List[str],
     joint_indices: Optional[List[int]] = None,
@@ -18,15 +18,15 @@ def waypoints_to_joint_trajectory(
     accelerations: Optional[List[np.ndarray]] = None,
 ) -> JointTrajectory:
     """
-    Convert HPP waypoints to a ROS2 JointTrajectory message.
+    Convert HPP configs to a ROS2 JointTrajectory message.
 
     Args:
-        waypoints: List of configuration vectors from HPP
+        configs: List of configuration vectors from HPP
         times: List of timestamps (path parameter values)
         joint_names: ROS2 joint names in desired order
         joint_indices: Indices to extract from HPP config (default: 0 to len(joint_names))
-        velocities: Optional velocity vectors (same length as waypoints)
-        accelerations: Optional acceleration vectors (same length as waypoints)
+        velocities: Optional velocity vectors (same length as configs)
+        accelerations: Optional acceleration vectors (same length as configs)
 
     Returns:
         JointTrajectory message ready to send to ros2_control
@@ -37,13 +37,13 @@ def waypoints_to_joint_trajectory(
     trajectory = JointTrajectory()
     trajectory.joint_names = joint_names
 
-    n_points = len(waypoints)
+    n_points = len(configs)
 
-    for i, (wp, t) in enumerate(zip(waypoints, times)):
+    for i, (cfg, t) in enumerate(zip(configs, times)):
         point = JointTrajectoryPoint()
 
         # Extract relevant joint positions
-        point.positions = [float(wp[j]) for j in joint_indices]
+        point.positions = [float(cfg[j]) for j in joint_indices]
 
         # Set velocities if provided explicitly
         if velocities is not None and i < len(velocities):
@@ -69,6 +69,10 @@ def waypoints_to_joint_trajectory(
     return trajectory
 
 
+# Backward compatibility alias
+waypoints_to_joint_trajectory = configs_to_joint_trajectory
+
+
 def extract_joint_config(
     hpp_config: np.ndarray,
     n_joints: int,
@@ -92,7 +96,7 @@ def extract_joint_config(
 
 
 def add_time_parameterization(
-    waypoints: List[np.ndarray],
+    configs: List[np.ndarray],
     times: List[float],
     max_velocity: float = 1.0,
     max_acceleration: float = 0.5,
@@ -104,7 +108,7 @@ def add_time_parameterization(
     For proper time parameterization, use HPP's SimpleTimeParameterization.
 
     Args:
-        waypoints: Configuration waypoints
+        configs: Configuration vectors
         times: Original path parameter values
         max_velocity: Maximum joint velocity (rad/s)
         max_acceleration: Maximum joint acceleration (rad/s^2)
@@ -112,15 +116,15 @@ def add_time_parameterization(
     Returns:
         Rescaled times
     """
-    if len(waypoints) < 2:
+    if len(configs) < 2:
         return times
 
     # Compute max displacement per segment
     scaled_times = [0.0]
     total_time = 0.0
 
-    for i in range(1, len(waypoints)):
-        dq = np.abs(waypoints[i] - waypoints[i - 1])
+    for i in range(1, len(configs)):
+        dq = np.abs(configs[i] - configs[i - 1])
         max_dq = np.max(dq)
 
         # Time needed at max velocity
