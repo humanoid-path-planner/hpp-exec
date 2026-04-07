@@ -15,15 +15,18 @@ Prerequisites:
     python3 ~/devel/hpp-exec/examples/simple_trajectory.py
 """
 
-import sys
 import numpy as np
 
 from hpp_exec import send_trajectory
 
-
 FR3_JOINTS = [
-    "fr3_joint1", "fr3_joint2", "fr3_joint3", "fr3_joint4",
-    "fr3_joint5", "fr3_joint6", "fr3_joint7",
+    "fr3_joint1",
+    "fr3_joint2",
+    "fr3_joint3",
+    "fr3_joint4",
+    "fr3_joint5",
+    "fr3_joint6",
+    "fr3_joint7",
 ]
 
 # FR3 key poses (7 DOF)
@@ -63,7 +66,8 @@ def main():
         # times are path parameters (0 to 1), NOT real seconds.
         # max_velocity rescales them to respect joint velocity limits.
         success = send_trajectory(
-            configs, times,
+            configs,
+            times,
             joint_names=FR3_JOINTS,
             max_velocity=0.5,
         )
@@ -73,7 +77,7 @@ def main():
             print("  Launch with: ./hpp-exec/scripts/launch_gazebo_gripper.sh")
             return 1
 
-        print(f"  Done.")
+        print("  Done.")
 
     print("\nAll segments complete!")
     return 0

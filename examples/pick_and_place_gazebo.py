@@ -15,14 +15,15 @@ Prerequisites:
     python3 ~/devel/hpp-exec/examples/pick_and_place_gazebo.py
 """
 
-from pick_and_place_planning import (
-    plan_pick_and_place,
-    extract_configs,
-    FR3_ARM_JOINTS,
-)
-from hpp_exec import execute_segments
-from hpp_exec.gripper import segments_from_graph, extract_grasp_transitions
 from gripper_controllers import JointTrajectoryGripperController
+from pick_and_place_planning import (
+    FR3_ARM_JOINTS,
+    extract_configs,
+    plan_pick_and_place,
+)
+
+from hpp_exec import execute_segments
+from hpp_exec.gripper import extract_grasp_transitions, segments_from_graph
 
 
 def main():
@@ -51,7 +52,9 @@ def main():
 
     # --- Build segments from constraint graph ---
     segments = segments_from_graph(
-        full_configs, times, cg,
+        full_configs,
+        times,
+        cg,
         on_grasp=gripper.close,
         on_release=gripper.open,
     )
@@ -59,7 +62,9 @@ def main():
     # --- Execute ---
     print(f"\nExecuting {len(segments)} segments on Gazebo...")
     success = execute_segments(
-        segments, full_configs, times,
+        segments,
+        full_configs,
+        times,
         joint_names=FR3_ARM_JOINTS,
         joint_indices=list(range(7)),
         max_velocity=0.3,

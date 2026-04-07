@@ -10,9 +10,10 @@ Usage:
     python3 tests/test_segments.py
 """
 
-import numpy as np
-import sys
 import os
+import sys
+
+import numpy as np
 
 # Allow running from repo root without install
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
@@ -21,6 +22,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 # ---------------------------------------------------------------------------
 # Mock constraint graph (same pattern as test_gripper_gazebo.py)
 # ---------------------------------------------------------------------------
+
 
 class MockConstraintGraph:
     """Simulates HPP constraint graph state queries."""
@@ -48,6 +50,7 @@ class MockConstraintGraph:
 # ---------------------------------------------------------------------------
 # Tests for extract_grasp_transitions
 # ---------------------------------------------------------------------------
+
 
 def test_no_transitions():
     """All configs in same state → no transitions."""
@@ -82,10 +85,12 @@ def test_grasp_and_release():
 
     configs = [np.array([float(i)]) for i in range(30)]
     times = [float(i) for i in range(30)]
-    graph = MockConstraintGraph({
-        10: "gripper grasps box/handle",
-        20: "free",
-    })
+    graph = MockConstraintGraph(
+        {
+            10: "gripper grasps box/handle",
+            20: "free",
+        }
+    )
 
     transitions = extract_grasp_transitions(configs, times, graph)
     assert len(transitions) == 2
@@ -103,17 +108,23 @@ def test_grasp_and_release():
 
 def test_empty_configs():
     from hpp_exec.gripper import extract_grasp_transitions
+
     assert extract_grasp_transitions([], [], MockConstraintGraph({})) == []
 
 
 def test_single_config():
     from hpp_exec.gripper import extract_grasp_transitions
-    assert extract_grasp_transitions([np.array([0.0])], [0.0], MockConstraintGraph({})) == []
+
+    assert (
+        extract_grasp_transitions([np.array([0.0])], [0.0], MockConstraintGraph({}))
+        == []
+    )
 
 
 # ---------------------------------------------------------------------------
 # Tests for segments_from_graph
 # ---------------------------------------------------------------------------
+
 
 def test_segments_no_transitions():
     """No grasp changes → single segment covering all configs."""
@@ -124,7 +135,9 @@ def test_segments_no_transitions():
     graph = MockConstraintGraph({})
 
     segments = segments_from_graph(
-        configs, times, graph,
+        configs,
+        times,
+        graph,
         on_grasp=lambda: True,
         on_release=lambda: True,
     )
@@ -140,10 +153,12 @@ def test_segments_pick_and_place():
 
     configs = [np.array([float(i)]) for i in range(30)]
     times = [float(i) for i in range(30)]
-    graph = MockConstraintGraph({
-        10: "gripper grasps box/handle",
-        20: "free",
-    })
+    graph = MockConstraintGraph(
+        {
+            10: "gripper grasps box/handle",
+            20: "free",
+        }
+    )
 
     close_called = []
     open_called = []
@@ -157,7 +172,9 @@ def test_segments_pick_and_place():
         return True
 
     segments = segments_from_graph(
-        configs, times, graph,
+        configs,
+        times,
+        graph,
         on_grasp=mock_close,
         on_release=mock_open,
     )
@@ -193,6 +210,7 @@ def test_segments_pick_and_place():
 # Tests for Segment dataclass
 # ---------------------------------------------------------------------------
 
+
 def test_segment_defaults():
     from hpp_exec.ros2_sender import Segment
 
@@ -208,7 +226,8 @@ def test_segment_with_actions():
 
     actions_run = []
     seg = Segment(
-        10, 20,
+        10,
+        20,
         pre_actions=[lambda: actions_run.append("pre") or True],
         post_actions=[lambda: actions_run.append("post") or True],
     )
@@ -222,8 +241,10 @@ def test_segment_with_actions():
 # Tests for state name parsing
 # ---------------------------------------------------------------------------
 
+
 def test_parse_free():
     from hpp_exec.gripper import _parse_grasps_from_state_name
+
     assert _parse_grasps_from_state_name("free") == set()
     assert _parse_grasps_from_state_name("Free") == set()
     assert _parse_grasps_from_state_name("") == set()
@@ -231,12 +252,14 @@ def test_parse_free():
 
 def test_parse_single_grasp():
     from hpp_exec.gripper import _parse_grasps_from_state_name
+
     result = _parse_grasps_from_state_name("r_gripper grasps box/handle")
     assert result == {"r_gripper grasps box/handle"}
 
 
 def test_parse_multi_grasp():
     from hpp_exec.gripper import _parse_grasps_from_state_name
+
     result = _parse_grasps_from_state_name(
         "r_gripper grasps box/handle : l_gripper grasps cup/handle"
     )

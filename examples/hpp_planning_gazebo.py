@@ -24,9 +24,8 @@ import time
 
 import numpy as np
 from pinocchio import SE3
-
+from pyhpp.core import BiRRTPlanner, Problem
 from pyhpp.pinocchio import Device, urdf
-from pyhpp.core import Problem, BiRRTPlanner
 
 from hpp_exec import send_trajectory
 
@@ -38,8 +37,13 @@ FR3_URDF = os.path.join(PROJECT_DIR, "robots", "fr3", "fr3.urdf")
 FR3_SRDF = os.path.join(PROJECT_DIR, "robots", "fr3", "fr3.srdf")
 
 FR3_ARM_JOINTS = [
-    "fr3_joint1", "fr3_joint2", "fr3_joint3", "fr3_joint4",
-    "fr3_joint5", "fr3_joint6", "fr3_joint7",
+    "fr3_joint1",
+    "fr3_joint2",
+    "fr3_joint3",
+    "fr3_joint4",
+    "fr3_joint5",
+    "fr3_joint6",
+    "fr3_joint7",
 ]
 
 
@@ -65,14 +69,32 @@ def main():
 
     # FR3 config: 7 arm joints + 2 finger joints (including mimic)
     # Fingers stay open (0.035), we only vary the arm.
-    q_init = np.array([
-        0.0, -0.785, 0.0, -2.356, 0.0, 1.571, 0.785,  # arm (ready pose)
-        0.035, 0.035,                                     # fingers
-    ])
-    q_goal = np.array([
-        0.5, -0.3, 0.3, -1.5, 0.2, 1.2, 0.5,            # arm (different pose)
-        0.035, 0.035,                                      # fingers
-    ])
+    q_init = np.array(
+        [
+            0.0,
+            -0.785,
+            0.0,
+            -2.356,
+            0.0,
+            1.571,
+            0.785,  # arm (ready pose)
+            0.035,
+            0.035,  # fingers
+        ]
+    )
+    q_goal = np.array(
+        [
+            0.5,
+            -0.3,
+            0.3,
+            -1.5,
+            0.2,
+            1.2,
+            0.5,  # arm (different pose)
+            0.035,
+            0.035,  # fingers
+        ]
+    )
 
     problem.initConfig(q_init)
     problem.addGoalConfig(q_goal)
@@ -115,7 +137,8 @@ def main():
     # --- Send to Gazebo ---
     print("\nSending to Gazebo...")
     success = send_trajectory(
-        configs, times,
+        configs,
+        times,
         joint_names=FR3_ARM_JOINTS,
         max_velocity=0.5,
     )

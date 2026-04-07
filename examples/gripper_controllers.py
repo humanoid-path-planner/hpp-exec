@@ -10,11 +10,11 @@ import logging
 from typing import List, Optional
 
 import rclpy
-from rclpy.node import Node
-from rclpy.action import ActionClient
-from control_msgs.action import FollowJointTrajectory, GripperCommand
-from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 from builtin_interfaces.msg import Duration
+from control_msgs.action import FollowJointTrajectory, GripperCommand
+from rclpy.action import ActionClient
+from rclpy.node import Node
+from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 
 logger = logging.getLogger(__name__)
 
@@ -252,7 +252,8 @@ class FrankaGripperController:
 
         logger.info(
             "Opening gripper: width=%.3fm, speed=%.3fm/s",
-            self.open_width, self.move_speed,
+            self.open_width,
+            self.move_speed,
         )
 
         future = self._move_client.send_goal_async(goal)
@@ -287,7 +288,8 @@ class FrankaGripperController:
 
         logger.info(
             "Grasping: width=%.3fm, force=%.1fN",
-            self.grasp_width, self.grasp_force,
+            self.grasp_width,
+            self.grasp_force,
         )
 
         future = self._grasp_client.send_goal_async(goal)

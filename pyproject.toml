@@ -9,54 +9,53 @@ description = "ROS2 execution utilities for HPP-generated trajectories"
 readme = "README.md"
 license = {text = "BSD-2-Clause"}
 authors = [
-    {name = "LAAS-CNRS", email = "hpp@laas.fr"}
+  {name = "LAAS-CNRS", email = "hpp@laas.fr"}
 ]
 requires-python = ">=3.8"
 classifiers = [
-    "Development Status :: 3 - Alpha",
-    "Intended Audience :: Science/Research",
-    "License :: OSI Approved :: BSD License",
-    "Operating System :: POSIX :: Linux",
-    "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
-    "Topic :: Scientific/Engineering :: Robotics",
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Science/Research",
+  "License :: OSI Approved :: BSD License",
+  "Operating System :: POSIX :: Linux",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.8",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Topic :: Scientific/Engineering :: Robotics"
 ]
 keywords = ["robotics", "motion-planning", "hpp", "manipulation"]
-
 dependencies = [
-    "numpy",
-    "pinocchio",
+  "numpy",
+  "pinocchio"
 ]
 
 [project.optional-dependencies]
 viewer = ["viser"]
 dev = [
-    "pytest",
-    "pytest-cov",
-    "black",
-    "ruff",
+  "pytest",
+  "pytest-cov",
+  "black",
+  "ruff"
 ]
 
 [project.urls]
 Homepage = "https://github.com/humanoid-path-planner"
 Documentation = "https://humanoid-path-planner.github.io/hpp-doc/"
 
-[tool.setuptools.packages.find]
-where = ["."]
-include = ["hpp_exec*"]
-
 [tool.black]
 line-length = 88
 target-version = ["py38", "py39", "py310", "py311"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
 
 [tool.ruff]
 line-length = 88
 select = ["E", "F", "W", "I"]
 ignore = ["E501"]
 
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-python_files = ["test_*.py"]
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["hpp_exec*"]

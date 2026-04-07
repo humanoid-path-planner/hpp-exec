@@ -34,13 +34,13 @@ import numpy as np
 logger = logging.getLogger(__name__)
 
 import rclpy
-from rclpy.node import Node
-from rclpy.action import ActionClient
 from control_msgs.action import FollowJointTrajectory
+from rclpy.action import ActionClient
+from rclpy.node import Node
 
 from hpp_exec.trajectory_utils import (
-    configs_to_joint_trajectory,
     add_time_parameterization,
+    configs_to_joint_trajectory,
 )
 
 
@@ -66,7 +66,9 @@ class _TrajectorySenderNode(Node):
 
         # Compute expected duration from last trajectory point
         last_point = trajectory.points[-1]
-        duration = last_point.time_from_start.sec + last_point.time_from_start.nanosec * 1e-9
+        duration = (
+            last_point.time_from_start.sec + last_point.time_from_start.nanosec * 1e-9
+        )
 
         self.get_logger().info(
             f"Sending trajectory: {len(trajectory.points)} points, "
@@ -138,14 +140,17 @@ def send_trajectory(
     # Scale times if velocity/acceleration limits provided
     if max_velocity is not None:
         times = add_time_parameterization(
-            configs, times,
+            configs,
+            times,
             max_velocity=max_velocity,
             max_acceleration=max_acceleration or 0.5,
         )
 
     # Convert to ROS2 message
     trajectory = configs_to_joint_trajectory(
-        configs, times, joint_names,
+        configs,
+        times,
+        joint_names,
         joint_indices=joint_indices,
     )
 
@@ -177,13 +182,16 @@ def send_trajectory_async(
     """
     if max_velocity is not None:
         times = add_time_parameterization(
-            configs, times,
+            configs,
+            times,
             max_velocity=max_velocity,
             max_acceleration=max_acceleration or 0.5,
         )
 
     trajectory = configs_to_joint_trajectory(
-        configs, times, joint_names,
+        configs,
+        times,
+        joint_names,
         joint_indices=joint_indices,
     )
 
@@ -206,6 +214,7 @@ def send_trajectory_async(
 # ---------------------------------------------------------------------------
 # Segment-based execution with pre/post action hooks
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class Segment:
@@ -268,15 +277,17 @@ def execute_segments(
     for i, segment in enumerate(segments):
         # 1. Pre-actions
         for action in segment.pre_actions:
-            action_name = getattr(action, "__name__", None) or getattr(action, "__qualname__", repr(action))
+            action_name = getattr(action, "__name__", None) or getattr(
+                action, "__qualname__", repr(action)
+            )
             logger.info("Segment %d: running pre-action '%s'", i, action_name)
             if not action():
                 logger.error("Segment %d: pre-action '%s' failed", i, action_name)
                 return False
 
         # 2. Send arm trajectory
-        seg_configs = configs[segment.start_index:segment.end_index]
-        seg_times = times[segment.start_index:segment.end_index]
+        seg_configs = configs[segment.start_index : segment.end_index]
+        seg_times = times[segment.start_index : segment.end_index]
 
         if len(seg_configs) >= 2:
             # Normalize times to start from 0
@@ -285,11 +296,15 @@ def execute_segments(
 
             logger.info(
                 "Segment %d: sending %d configs (%.2fs)",
-                i, len(seg_configs), seg_times[-1],
+                i,
+                len(seg_configs),
+                seg_times[-1],
             )
 
             success = send_trajectory(
-                seg_configs, seg_times, joint_names,
+                seg_configs,
+                seg_times,
+                joint_names,
                 controller_topic=controller_topic,
                 max_velocity=max_velocity,
                 max_acceleration=max_acceleration,
@@ -304,7 +319,9 @@ def execute_segments(
 
         # 3. Post-actions
         for action in segment.post_actions:
-            action_name = getattr(action, "__name__", None) or getattr(action, "__qualname__", repr(action))
+            action_name = getattr(action, "__name__", None) or getattr(
+                action, "__qualname__", repr(action)
+            )
             logger.info("Segment %d: running post-action '%s'", i, action_name)
             if not action():
                 logger.error("Segment %d: post-action '%s' failed", i, action_name)

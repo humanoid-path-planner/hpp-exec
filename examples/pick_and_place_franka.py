@@ -21,14 +21,15 @@ Prerequisites:
     python3 pick_and_place_franka.py
 """
 
-from pick_and_place_planning import (
-    plan_pick_and_place,
-    extract_configs,
-    FR3_ARM_JOINTS,
-)
-from hpp_exec import execute_segments
-from hpp_exec.gripper import segments_from_graph, extract_grasp_transitions
 from gripper_controllers import FrankaGripperController
+from pick_and_place_planning import (
+    FR3_ARM_JOINTS,
+    extract_configs,
+    plan_pick_and_place,
+)
+
+from hpp_exec import execute_segments
+from hpp_exec.gripper import extract_grasp_transitions, segments_from_graph
 
 
 def main():
@@ -49,15 +50,17 @@ def main():
     # --- Franka gripper (real hardware) ---
     gripper = FrankaGripperController(
         arm_id="fr3",
-        open_width=0.08,       # fully open
-        grasp_width=0.02,      # cube is 4cm, leave margin
-        grasp_force=50.0,      # Newtons
-        grasp_speed=0.05,      # m/s
+        open_width=0.08,  # fully open
+        grasp_width=0.02,  # cube is 4cm, leave margin
+        grasp_force=50.0,  # Newtons
+        grasp_speed=0.05,  # m/s
     )
 
     # --- Build segments from constraint graph ---
     segments = segments_from_graph(
-        full_configs, times, cg,
+        full_configs,
+        times,
+        cg,
         on_grasp=gripper.close,
         on_release=gripper.open,
     )
@@ -65,7 +68,9 @@ def main():
     # --- Execute ---
     print(f"\nExecuting {len(segments)} segments on real FR3...")
     success = execute_segments(
-        segments, full_configs, times,
+        segments,
+        full_configs,
+        times,
         joint_names=FR3_ARM_JOINTS,
         joint_indices=list(range(7)),
         max_velocity=0.3,
