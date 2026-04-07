@@ -1,0 +1,13 @@
+<?xml version='1.0'?>
+<package format='2'>
+  <name>hpp-exec</name>
+  <version>0.1.0</version>
+  <description>ROS2 execution utilities for HPP-generated trajectories</description>
+
+  <maintainer email="hpp@laas.fr">Paul Sardin</maintainer>
+  <license>BSD</license>
+
+  <author>Paul Sardin</author>
+
+  <exec_depend>hpp-python</exec_depend>
+</package>

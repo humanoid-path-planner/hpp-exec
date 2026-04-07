@@ -1,4 +1,5 @@
 build/
+build-rel/
 install/
 log/
 __pycache__/
