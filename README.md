@@ -6,22 +6,49 @@ ROS2 execution utilities for HPP-generated trajectories.
 
 You write your HPP planning script using `pyhpp` directly, then use `hpp_exec` to send the trajectory to `ros2_control`.
 
+## Tutorials
+
+The official tutorials for this package are in [hpp_tutorial](https://github.com/humanoid-path-planner/hpp_tutorial):
+
+- **Tutorial 6**: Plan a simple arm motion and execute on Gazebo via `send_trajectory()`
+- **Tutorial 7**: Pick-and-place with gripper actions using `segments_from_graph()` and `execute_segments()`
+
+## Creating configs and times from HPP
+
+After planning and time parameterization with HPP, you have a `Path` object that maps time (seconds) to robot configurations. Sample it at regular intervals to get discrete waypoints:
+
 ```python
-from pyhpp.pinocchio import Device, urdf
-from pyhpp.core import Problem, BiRRTPlanner
+import numpy as np
+
+# After solving and time parameterization:
+# p_timed = ps.getPath(pathId)  # or via path optimizer
+
+n_samples = 50
+configs = []
+times = []
+
+for i in range(n_samples + 1):
+    t = (i / n_samples) * p_timed.length()
+    q, success = p_timed(t)
+    if success:
+        configs.append(np.array(q))
+        times.append(t)
+
+# configs: List[np.ndarray] - configuration vectors at each waypoint
+# times: List[float] - timestamps in seconds
+```
+
+The HPP configuration vector typically includes all robot DOFs. Use `joint_indices` to select which joints to send to ros2_control (e.g., arm joints only, excluding fingers).
+
+## Sending to ros2_control
+
+```python
 from hpp_exec import send_trajectory
 
-# Your HPP planning script...
-robot = Device("ur5")
-urdf.loadModel(robot, ...)
-problem = Problem(robot)
-# ... solve and get configs ...
-
-# Execute on robot
 send_trajectory(
     configs, times,
-    joint_names=["shoulder_pan_joint", "shoulder_lift_joint", ...],
-    max_velocity=1.0,
+    joint_names=["joint1", "joint2", ...],  # ROS2 joint names
+    joint_indices=list(range(7)),            # Which HPP config indices to use
 )
 ```
 
