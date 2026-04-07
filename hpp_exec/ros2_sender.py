@@ -30,9 +30,6 @@ from dataclasses import dataclass, field
 from typing import Callable, List, Optional
 
 import numpy as np
-
-logger = logging.getLogger(__name__)
-
 import rclpy
 from control_msgs.action import FollowJointTrajectory
 from rclpy.action import ActionClient
@@ -42,6 +39,8 @@ from hpp_exec.trajectory_utils import (
     add_time_parameterization,
     configs_to_joint_trajectory,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class _TrajectorySenderNode(Node):

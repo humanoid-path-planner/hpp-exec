@@ -24,9 +24,12 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import Callable, List
+from typing import TYPE_CHECKING, Callable, List
 
 import numpy as np
+
+if TYPE_CHECKING:
+    from hpp_exec.ros2_sender import Segment
 
 logger = logging.getLogger(__name__)
 
