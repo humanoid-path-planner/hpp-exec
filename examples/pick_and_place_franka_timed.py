@@ -371,7 +371,7 @@ def main():
         times,
         joint_names=FR3_ARM_JOINTS,
         joint_indices=list(range(7)),
-        max_velocity=None,  # times already in seconds from HPP
+        time_parameterization="none",  # times already in seconds from HPP
     )
 
     gripper.destroy()

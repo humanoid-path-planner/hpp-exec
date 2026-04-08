@@ -64,11 +64,12 @@ def main():
         print(f"\n  {name} ({len(configs)} configs)...")
 
         # times are path parameters (0 to 1), NOT real seconds.
-        # max_velocity rescales them to respect joint velocity limits.
+        # "trapezoidal" rescales them to respect joint velocity limits.
         success = send_trajectory(
             configs,
             times,
             joint_names=FR3_JOINTS,
+            time_parameterization="trapezoidal",
             max_velocity=0.5,
         )
 

@@ -73,6 +73,7 @@ def main():
         times,
         joint_names=FR3_ARM_JOINTS,
         joint_indices=list(range(7)),
+        time_parameterization="trapezoidal",
         max_velocity=0.3,
     )
 

@@ -140,6 +140,7 @@ def main():
         configs,
         times,
         joint_names=FR3_ARM_JOINTS,
+        time_parameterization="trapezoidal",
         max_velocity=0.5,
     )
 

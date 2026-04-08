@@ -10,10 +10,11 @@ Example:
     configs = [...]
     times = [...]
 
-    # Execute on robot
+    # Execute on robot (times are path parameters, need rescaling)
     send_trajectory(
         configs, times,
         joint_names=["joint1", "joint2", ...],
+        time_parameterization="trapezoidal",
         max_velocity=1.0,
     )
 """
