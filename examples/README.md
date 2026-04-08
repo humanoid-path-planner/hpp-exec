@@ -18,7 +18,6 @@ cd ~/devel/src && make all
 |------|-------------|--------|
 | `simple_trajectory.py` | Send hardcoded poses, no HPP planning | Gazebo |
 | `hpp_planning_gazebo.py` | HPP BiRRT planning + execution | Gazebo |
-| `pick_and_place_planning.py` | HPP manipulation problem (importable) | Planning only |
 | `pick_and_place_gazebo.py` | Pick-and-place with gripper on Gazebo | Gazebo |
 | `pick_and_place_franka.py` | Pick-and-place with Franka gripper | Real hardware |
 | `pick_and_place_franka_timed.py` | Same + HPP `SimpleTimeParameterization` | Real hardware |
