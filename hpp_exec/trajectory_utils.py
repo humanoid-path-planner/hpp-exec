@@ -66,9 +66,6 @@ def configs_to_joint_trajectory(
     return trajectory
 
 
-# Backward compatibility alias
-waypoints_to_joint_trajectory = configs_to_joint_trajectory
-
 
 def extract_joint_config(
     hpp_config: np.ndarray,

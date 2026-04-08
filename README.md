@@ -15,7 +15,7 @@ The official tutorials for this package are in [hpp_tutorial](https://github.com
 
 ## Creating configs and times from HPP
 
-After planning and time parameterization with HPP, you have a `Path` object that maps time (seconds) to robot configurations. Sample it at regular intervals to get discrete waypoints:
+After planning and time parameterization with HPP, you have a `Path` object that maps time (seconds) to robot configurations. Sample it at regular intervals to get discrete configs:
 
 ```python
 import numpy as np
@@ -34,7 +34,7 @@ for i in range(n_samples + 1):
         configs.append(np.array(q))
         times.append(t)
 
-# configs: List[np.ndarray] - configuration vectors at each waypoint
+# configs: List[np.ndarray] - configuration vectors at each sample
 # times: List[float] - timestamps in seconds
 ```
 

@@ -36,7 +36,6 @@ from hpp_exec.trajectory_utils import (
     add_time_parameterization,
     configs_to_joint_trajectory,
     extract_joint_config,
-    waypoints_to_joint_trajectory,  # backward compat alias
 )
 
 __all__ = [
@@ -45,7 +44,6 @@ __all__ = [
     "execute_segments",
     "Segment",
     "configs_to_joint_trajectory",
-    "waypoints_to_joint_trajectory",  # backward compat
     "add_time_parameterization",
     "extract_joint_config",
     "segments_from_graph",
