@@ -30,18 +30,17 @@ from dataclasses import dataclass, field
 from typing import Callable, List, Optional
 
 import numpy as np
-
-logger = logging.getLogger(__name__)
-
 import rclpy
-from rclpy.node import Node
-from rclpy.action import ActionClient
 from control_msgs.action import FollowJointTrajectory
+from rclpy.action import ActionClient
+from rclpy.node import Node
 
 from hpp_exec.trajectory_utils import (
-    configs_to_joint_trajectory,
     add_time_parameterization,
+    configs_to_joint_trajectory,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class _TrajectorySenderNode(Node):
@@ -66,7 +65,9 @@ class _TrajectorySenderNode(Node):
 
         # Compute expected duration from last trajectory point
         last_point = trajectory.points[-1]
-        duration = last_point.time_from_start.sec + last_point.time_from_start.nanosec * 1e-9
+        duration = (
+            last_point.time_from_start.sec + last_point.time_from_start.nanosec * 1e-9
+        )
 
         self.get_logger().info(
             f"Sending trajectory: {len(trajectory.points)} points, "
@@ -101,8 +102,9 @@ def send_trajectory(
     times: List[float],
     joint_names: List[str],
     controller_topic: str = "/joint_trajectory_controller/follow_joint_trajectory",
-    max_velocity: Optional[float] = None,
-    max_acceleration: Optional[float] = None,
+    time_parameterization: str = "none",
+    max_velocity: float = 1.0,
+    max_acceleration: float = 0.5,
     joint_indices: Optional[List[int]] = None,
 ) -> bool:
     """
@@ -110,13 +112,14 @@ def send_trajectory(
 
     Args:
         configs: List of configuration vectors (numpy arrays).
-        times: List of timestamps in seconds. If these are HPP path parameters,
-               you MUST pass max_velocity to rescale them.
+        times: List of timestamps in seconds, or path parameters if using parameterization.
         joint_names: ROS2 joint names in order.
         controller_topic: FollowJointTrajectory action topic.
-        max_velocity: Rescale times so no joint moves faster than this (rad/s).
-            Required when times are raw HPP path parameters.
-        max_acceleration: Max joint acceleration for rescaling (rad/s^2, default 0.5).
+        time_parameterization: How to interpret/transform times:
+            - "none": times are already real seconds (e.g., from HPP's SimpleTimeParameterization)
+            - "trapezoidal": rescale path parameters to real time based on velocity limits
+        max_velocity: Max joint velocity in rad/s (used by "trapezoidal").
+        max_acceleration: Max joint acceleration in rad/s^2 (used by "trapezoidal").
         joint_indices: Indices to extract from each config (default: 0..len(joint_names)).
 
     Returns:
@@ -128,24 +131,32 @@ def send_trajectory(
         configs = [np.array(path(t)[0]) for t in np.linspace(0, path.length(), 100)]
         times = list(np.linspace(0, path.length(), 100))
 
-        # times are path parameters — must rescale:
+        # times are path parameters — use trapezoidal to convert to real time:
         send_trajectory(
             configs, times,
             joint_names=["shoulder_pan", "shoulder_lift", "elbow", ...],
-            max_velocity=1.0,  # Scale path parameter to real time
+            time_parameterization="trapezoidal",
+            max_velocity=1.0,
         )
     """
-    # Scale times if velocity/acceleration limits provided
-    if max_velocity is not None:
+    if time_parameterization == "trapezoidal":
         times = add_time_parameterization(
-            configs, times,
+            configs,
+            times,
             max_velocity=max_velocity,
-            max_acceleration=max_acceleration or 0.5,
+            max_acceleration=max_acceleration,
+        )
+    elif time_parameterization != "none":
+        raise ValueError(
+            f"Unknown time_parameterization: {time_parameterization!r}. "
+            "Use 'none' or 'trapezoidal'."
         )
 
     # Convert to ROS2 message
     trajectory = configs_to_joint_trajectory(
-        configs, times, joint_names,
+        configs,
+        times,
+        joint_names,
         joint_indices=joint_indices,
     )
 
@@ -165,8 +176,9 @@ def send_trajectory_async(
     times: List[float],
     joint_names: List[str],
     controller_topic: str = "/joint_trajectory_controller/follow_joint_trajectory",
-    max_velocity: Optional[float] = None,
-    max_acceleration: Optional[float] = None,
+    time_parameterization: str = "none",
+    max_velocity: float = 1.0,
+    max_acceleration: float = 0.5,
     joint_indices: Optional[List[int]] = None,
 ):
     """
@@ -174,16 +186,29 @@ def send_trajectory_async(
 
     Returns the goal handle for later status checking.
     Caller is responsible for ROS2 lifecycle (rclpy.init/shutdown).
+
+    Args:
+        time_parameterization: "none" (times are real seconds) or "trapezoidal" (rescale).
+        max_velocity: Max joint velocity in rad/s (used by "trapezoidal").
+        max_acceleration: Max joint acceleration in rad/s^2 (used by "trapezoidal").
     """
-    if max_velocity is not None:
+    if time_parameterization == "trapezoidal":
         times = add_time_parameterization(
-            configs, times,
+            configs,
+            times,
             max_velocity=max_velocity,
-            max_acceleration=max_acceleration or 0.5,
+            max_acceleration=max_acceleration,
+        )
+    elif time_parameterization != "none":
+        raise ValueError(
+            f"Unknown time_parameterization: {time_parameterization!r}. "
+            "Use 'none' or 'trapezoidal'."
         )
 
     trajectory = configs_to_joint_trajectory(
-        configs, times, joint_names,
+        configs,
+        times,
+        joint_names,
         joint_indices=joint_indices,
     )
 
@@ -206,6 +231,7 @@ def send_trajectory_async(
 # ---------------------------------------------------------------------------
 # Segment-based execution with pre/post action hooks
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class Segment:
@@ -239,8 +265,9 @@ def execute_segments(
     times: List[float],
     joint_names: List[str],
     joint_indices: Optional[List[int]] = None,
-    max_velocity: Optional[float] = None,
-    max_acceleration: Optional[float] = None,
+    time_parameterization: str = "none",
+    max_velocity: float = 1.0,
+    max_acceleration: float = 0.5,
     controller_topic: str = "/joint_trajectory_controller/follow_joint_trajectory",
 ) -> bool:
     """Execute trajectory segments with pre/post action hooks.
@@ -254,12 +281,13 @@ def execute_segments(
         segments: Ordered list of Segment objects defining trajectory slices
             and their associated actions.
         configs: Full HPP configuration vectors.
-        times: Timestamps for each config.
+        times: Timestamps for each config, or path parameters if using parameterization.
         joint_names: ROS2 joint names for the arm.
         joint_indices: Indices of arm DOFs in the HPP config vector.
             Default: 0..len(joint_names).
-        max_velocity: Rescale times so no joint exceeds this velocity (rad/s).
-        max_acceleration: Max joint acceleration for rescaling (rad/s^2).
+        time_parameterization: "none" (times are real seconds) or "trapezoidal" (rescale).
+        max_velocity: Max joint velocity in rad/s (used by "trapezoidal").
+        max_acceleration: Max joint acceleration in rad/s^2 (used by "trapezoidal").
         controller_topic: FollowJointTrajectory action topic.
 
     Returns:
@@ -268,15 +296,17 @@ def execute_segments(
     for i, segment in enumerate(segments):
         # 1. Pre-actions
         for action in segment.pre_actions:
-            action_name = getattr(action, "__name__", None) or getattr(action, "__qualname__", repr(action))
+            action_name = getattr(action, "__name__", None) or getattr(
+                action, "__qualname__", repr(action)
+            )
             logger.info("Segment %d: running pre-action '%s'", i, action_name)
             if not action():
                 logger.error("Segment %d: pre-action '%s' failed", i, action_name)
                 return False
 
         # 2. Send arm trajectory
-        seg_configs = configs[segment.start_index:segment.end_index]
-        seg_times = times[segment.start_index:segment.end_index]
+        seg_configs = configs[segment.start_index : segment.end_index]
+        seg_times = times[segment.start_index : segment.end_index]
 
         if len(seg_configs) >= 2:
             # Normalize times to start from 0
@@ -285,12 +315,17 @@ def execute_segments(
 
             logger.info(
                 "Segment %d: sending %d configs (%.2fs)",
-                i, len(seg_configs), seg_times[-1],
+                i,
+                len(seg_configs),
+                seg_times[-1],
             )
 
             success = send_trajectory(
-                seg_configs, seg_times, joint_names,
+                seg_configs,
+                seg_times,
+                joint_names,
                 controller_topic=controller_topic,
+                time_parameterization=time_parameterization,
                 max_velocity=max_velocity,
                 max_acceleration=max_acceleration,
                 joint_indices=joint_indices,
@@ -304,7 +339,9 @@ def execute_segments(
 
         # 3. Post-actions
         for action in segment.post_actions:
-            action_name = getattr(action, "__name__", None) or getattr(action, "__qualname__", repr(action))
+            action_name = getattr(action, "__name__", None) or getattr(
+                action, "__qualname__", repr(action)
+            )
             logger.info("Segment %d: running post-action '%s'", i, action_name)
             if not action():
                 logger.error("Segment %d: post-action '%s' failed", i, action_name)

@@ -15,30 +15,28 @@ Or import from another script to access the path, robot, and graph:
 """
 
 import os
-import sys
 import time
 from math import pi
 
 import numpy as np
 from pinocchio import SE3, Quaternion
-
+from pyhpp.constraints import (
+    ComparisonType,
+    ComparisonTypes,
+    Implicit,
+    LockedJoint,
+    Transformation,
+)
+from pyhpp.core import Dichotomy, Straight
 from pyhpp.manipulation import (
     Device,
     Graph,
+    ManipulationPlanner,
     Problem,
     ProgressiveProjector,
     urdf,
-    ManipulationPlanner,
 )
 from pyhpp.manipulation.constraint_graph_factory import ConstraintGraphFactory
-from pyhpp.core import Dichotomy, Straight
-from pyhpp.constraints import (
-    Transformation,
-    ComparisonTypes,
-    ComparisonType,
-    Implicit,
-    LockedJoint,
-)
 
 # ---------------------------------------------------------------------------
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -50,8 +48,13 @@ CUBE_URDF = os.path.join(PROJECT_DIR, "robots", "cube", "cube.urdf")
 CUBE_SRDF = os.path.join(PROJECT_DIR, "robots", "cube", "cube.srdf")
 
 FR3_ARM_JOINTS = [
-    "fr3_joint1", "fr3_joint2", "fr3_joint3", "fr3_joint4",
-    "fr3_joint5", "fr3_joint6", "fr3_joint7",
+    "fr3_joint1",
+    "fr3_joint2",
+    "fr3_joint3",
+    "fr3_joint4",
+    "fr3_joint5",
+    "fr3_joint6",
+    "fr3_joint7",
 ]
 
 
@@ -69,10 +72,25 @@ def plan_pick_and_place():
     # Load cube at origin (like ur3-spheres)
     cube_pose = SE3(rotation=np.identity(3), translation=np.array([0, 0, 0]))
     urdf.loadModel(robot, 0, "cube", "freeflyer", CUBE_URDF, CUBE_SRDF, cube_pose)
-    robot.setJointBounds("cube/root_joint", [
-        -1.0, 1.0, -1.0, 1.0, -0.1, 1.0,
-        -1.0001, 1.0001, -1.0001, 1.0001, -1.0001, 1.0001, -1.0001, 1.0001,
-    ])
+    robot.setJointBounds(
+        "cube/root_joint",
+        [
+            -1.0,
+            1.0,
+            -1.0,
+            1.0,
+            -0.1,
+            1.0,
+            -1.0001,
+            1.0001,
+            -1.0001,
+            1.0001,
+            -1.0001,
+            1.0001,
+            -1.0001,
+            1.0001,
+        ],
+    )
     print(f"  Config size: {robot.configSize()}")
 
     # --- Constraint graph ---
@@ -90,7 +108,11 @@ def plan_pick_and_place():
     cube_joint = robot.model().getJointId("cube/root_joint")
 
     pc = Transformation(
-        "place_cube", robot, cube_joint, Id, cubePlacement,
+        "place_cube",
+        robot,
+        cube_joint,
+        Id,
+        cubePlacement,
         [False, False, True, True, True, False],
     )
     cts = ComparisonTypes()
@@ -103,7 +125,11 @@ def plan_pick_and_place():
 
     # Complement: x, y, rotz free
     pc = Transformation(
-        "place_cube/complement", robot, cube_joint, Id, cubePlacement,
+        "place_cube/complement",
+        robot,
+        cube_joint,
+        Id,
+        cubePlacement,
         [True, True, False, False, False, True],
     )
     cts[:] = (
@@ -123,7 +149,8 @@ def plan_pick_and_place():
         ComparisonType.Equality,
     )
     ll = LockedJoint(
-        robot, "cube/root_joint",
+        robot,
+        "cube/root_joint",
         np.array([0, 0, 0.02, 0, 0, 0, 1]),
         cts,
     )
@@ -136,7 +163,10 @@ def plan_pick_and_place():
 
     # Pre-placement (above table at z=0.1)
     pc = Transformation(
-        "preplace_cube", robot, cube_joint, Id,
+        "preplace_cube",
+        robot,
+        cube_joint,
+        Id,
         SE3(Quaternion(1, 0, 0, 0), np.array([0, 0, 0.1])),
         [False, False, True, True, True, False],
     )
@@ -159,20 +189,23 @@ def plan_pick_and_place():
     try:
         e = cg.getTransition("fr3/gripper > cube/handle | f_23")
         cg.addNumericalConstraintsToTransition(
-            e, [constraints["place_cube/complement"]])
+            e, [constraints["place_cube/complement"]]
+        )
     except RuntimeError:
         pass
     try:
         e = cg.getTransition("fr3/gripper < cube/handle | 0-0_32")
         cg.addNumericalConstraintsToTransition(
-            e, [constraints["place_cube/complement"]])
+            e, [constraints["place_cube/complement"]]
+        )
     except RuntimeError:
         pass
 
     problem.steeringMethod = Straight(problem)
     problem.pathValidation = Dichotomy(robot, 0)
     problem.pathProjector = ProgressiveProjector(
-        problem.distance(), problem.steeringMethod, 0.01)
+        problem.distance(), problem.steeringMethod, 0.01
+    )
 
     cg.initialize()
     print(f"  States: {cg.getStateNames()}")
@@ -180,16 +213,46 @@ def plan_pick_and_place():
 
     # --- Configs ---
     # FR3 arm (7) + fingers (2) + cube freeflyer (7) = 16
-    q_init = np.array([
-        0.0, -pi/4, 0.0, -3*pi/4, 0.0, pi/2, pi/4,   # arm (ready)
-        0.035, 0.035,                                    # fingers
-        0.5, 0.0, 0.02, 0.0, 0.0, 0.0, 1.0,            # cube at A
-    ])
-    q_goal = np.array([
-        0.0, -pi/4, 0.0, -3*pi/4, 0.0, pi/2, pi/4,   # arm (ready)
-        0.035, 0.035,                                    # fingers
-        0.3, 0.3, 0.02, 0.0, 0.0, 0.0, 1.0,            # cube at B
-    ])
+    q_init = np.array(
+        [
+            0.0,
+            -pi / 4,
+            0.0,
+            -3 * pi / 4,
+            0.0,
+            pi / 2,
+            pi / 4,  # arm (ready)
+            0.035,
+            0.035,  # fingers
+            0.5,
+            0.0,
+            0.02,
+            0.0,
+            0.0,
+            0.0,
+            1.0,  # cube at A
+        ]
+    )
+    q_goal = np.array(
+        [
+            0.0,
+            -pi / 4,
+            0.0,
+            -3 * pi / 4,
+            0.0,
+            pi / 2,
+            pi / 4,  # arm (ready)
+            0.035,
+            0.035,  # fingers
+            0.3,
+            0.3,
+            0.02,
+            0.0,
+            0.0,
+            0.0,
+            1.0,  # cube at B
+        ]
+    )
 
     problem.initConfig(q_init)
     problem.addGoalConfig(q_goal)

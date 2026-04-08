@@ -3,10 +3,10 @@ Utilities for converting HPP trajectories to ROS2 JointTrajectory messages.
 """
 
 from typing import List, Optional
-import numpy as np
 
-from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
+import numpy as np
 from builtin_interfaces.msg import Duration
+from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 
 
 def configs_to_joint_trajectory(
@@ -59,10 +59,7 @@ def configs_to_joint_trajectory(
         # Leave accelerations empty for controller to compute
 
         # Convert time to Duration
-        point.time_from_start = Duration(
-            sec=int(t),
-            nanosec=int((t - int(t)) * 1e9)
-        )
+        point.time_from_start = Duration(sec=int(t), nanosec=int((t - int(t)) * 1e9))
 
         trajectory.points.append(point)
 

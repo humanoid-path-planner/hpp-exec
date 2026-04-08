@@ -11,10 +11,11 @@ success = send_trajectory(
     configs,                # List[np.ndarray] — HPP configuration vectors
     times,                  # List[float] — timestamps (path params or seconds)
     joint_names,            # List[str] — ROS2 joint names
-    max_velocity=1.0,       # float — rescale times to respect this limit (rad/s)
-                            #   Required when times are HPP path parameters.
-                            #   Pass None to skip rescaling (times already in seconds).
-    max_acceleration=0.5,   # float — acceleration limit for rescaling (rad/s^2)
+    time_parameterization="none",  # "none" or "trapezoidal"
+                            #   "none": times are already real seconds
+                            #   "trapezoidal": rescale path params to real time
+    max_velocity=1.0,       # float — max joint velocity (rad/s), used by "trapezoidal"
+    max_acceleration=0.5,   # float — max joint acceleration (rad/s^2), used by "trapezoidal"
     joint_indices=None,     # List[int] — indices to extract from HPP config
                             #   Default: 0..len(joint_names)
     controller_topic="/joint_trajectory_controller/follow_joint_trajectory",
@@ -40,7 +41,8 @@ success = execute_segments(
     times,                  # List[float] — timestamps
     joint_names,            # List[str] — arm joint names
     joint_indices=None,     # List[int] — arm DOF indices in HPP config
-    max_velocity=None,      # float — velocity rescaling (None = skip)
+    time_parameterization="none",  # "none" or "trapezoidal"
+    max_velocity=1.0,       # float — max velocity (rad/s), used by "trapezoidal"
     controller_topic="/joint_trajectory_controller/follow_joint_trajectory",
 )
 ```

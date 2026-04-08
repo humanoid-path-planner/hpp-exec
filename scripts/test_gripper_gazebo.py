@@ -19,21 +19,22 @@ Usage (in terminal 2):
     PYTHONPATH=$HOME/devel/hpp-exec:$PYTHONPATH python3 ~/devel/hpp-exec/scripts/test_gripper_gazebo.py
 """
 
+# Import from examples/ — add to path if needed
+import os
 import sys
+
 import numpy as np
 
 from hpp_exec import execute_segments
-from hpp_exec.gripper import segments_from_graph, extract_grasp_transitions
+from hpp_exec.gripper import extract_grasp_transitions, segments_from_graph
 
-# Import from examples/ — add to path if needed
-import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "examples"))
 from gripper_controllers import JointTrajectoryGripperController
-
 
 # ---------------------------------------------------------------------------
 # Mock constraint graph (no HPP needed)
 # ---------------------------------------------------------------------------
+
 
 class MockConstraintGraph:
     """Simulates HPP constraint graph for a pick-and-place scenario.
@@ -67,13 +68,14 @@ class MockConstraintGraph:
 # Generate a pick-and-place trajectory for FR3
 # ---------------------------------------------------------------------------
 
+
 def generate_fr3_trajectory():
     """Generate a clear pick-and-place trajectory for FR3 (7 DOF arm)."""
 
-    home =      np.array([0.0, -0.785, 0.0, -2.356, 0.0,  1.571, 0.785])
-    pregrasp =  np.array([0.4, -0.3,   0.3, -1.5,   0.2,  1.2,   0.5])
-    place =     np.array([-0.4, -0.3,  -0.3, -1.5,  -0.2,  1.2,  -0.5])
-    retreat =   np.array([0.0, -0.785, 0.0, -2.356, 0.0,  1.571, 0.785])
+    home = np.array([0.0, -0.785, 0.0, -2.356, 0.0, 1.571, 0.785])
+    pregrasp = np.array([0.4, -0.3, 0.3, -1.5, 0.2, 1.2, 0.5])
+    place = np.array([-0.4, -0.3, -0.3, -1.5, -0.2, 1.2, -0.5])
+    retreat = np.array([0.0, -0.785, 0.0, -2.356, 0.0, 1.571, 0.785])
 
     configs = []
     times = []
@@ -110,6 +112,7 @@ def generate_fr3_trajectory():
 # Main
 # ---------------------------------------------------------------------------
 
+
 def main():
     configs, times = generate_fr3_trajectory()
     graph = MockConstraintGraph(grasp_at=20, release_at=40)
@@ -133,13 +136,20 @@ def main():
     )
 
     FR3_ARM_JOINTS = [
-        "fr3_joint1", "fr3_joint2", "fr3_joint3", "fr3_joint4",
-        "fr3_joint5", "fr3_joint6", "fr3_joint7",
+        "fr3_joint1",
+        "fr3_joint2",
+        "fr3_joint3",
+        "fr3_joint4",
+        "fr3_joint5",
+        "fr3_joint6",
+        "fr3_joint7",
     ]
 
     # Build segments from mock graph
     segments = segments_from_graph(
-        configs, times, graph,
+        configs,
+        times,
+        graph,
         on_grasp=gripper.close,
         on_release=gripper.open,
     )
@@ -153,9 +163,12 @@ def main():
     print()
 
     success = execute_segments(
-        segments, configs, times,
+        segments,
+        configs,
+        times,
         joint_names=FR3_ARM_JOINTS,
         joint_indices=list(range(7)),
+        time_parameterization="trapezoidal",
         max_velocity=0.3,
     )
 

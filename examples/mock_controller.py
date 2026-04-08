@@ -23,6 +23,7 @@ Usage:
     send_trajectory(configs, times,
         joint_names=['shoulder_pan_joint','shoulder_lift_joint','elbow_joint',
                      'wrist_1_joint','wrist_2_joint','wrist_3_joint'],
+        time_parameterization='trapezoidal',
         max_velocity=0.5)
     "
 
@@ -37,16 +38,17 @@ import os
 import time
 
 import rclpy
-from rclpy.node import Node
-from rclpy.action import ActionServer
-from rclpy.executors import MultiThreadedExecutor
 from control_msgs.action import FollowJointTrajectory, GripperCommand
+from rclpy.action import ActionServer
+from rclpy.node import Node
 from sensor_msgs.msg import JointState
 from std_msgs.msg import String
 
 
 class MockController(Node):
-    def __init__(self, joint_names: list, urdf_content: str = None, enable_gripper: bool = False):
+    def __init__(
+        self, joint_names: list, urdf_content: str = None, enable_gripper: bool = False
+    ):
         super().__init__("mock_controller")
 
         self.joint_names = joint_names
@@ -76,10 +78,11 @@ class MockController(Node):
         # Publish robot description if URDF provided
         if urdf_content:
             qos = rclpy.qos.QoSProfile(
-                depth=1,
-                durability=rclpy.qos.DurabilityPolicy.TRANSIENT_LOCAL
+                depth=1, durability=rclpy.qos.DurabilityPolicy.TRANSIENT_LOCAL
             )
-            self.robot_desc_pub = self.create_publisher(String, "/robot_description", qos)
+            self.robot_desc_pub = self.create_publisher(
+                String, "/robot_description", qos
+            )
             msg = String()
             msg.data = urdf_content
             self.robot_desc_pub.publish(msg)
@@ -92,7 +95,9 @@ class MockController(Node):
         self.get_logger().info("Mock Controller Ready")
         self.get_logger().info(f"  Joints: {joint_names}")
         self.get_logger().info("  Publishing: /joint_states @ 50Hz")
-        self.get_logger().info("  Action: /joint_trajectory_controller/follow_joint_trajectory")
+        self.get_logger().info(
+            "  Action: /joint_trajectory_controller/follow_joint_trajectory"
+        )
         if enable_gripper:
             self.get_logger().info("  Gripper: /gripper_controller/gripper_command")
         self.get_logger().info("")
@@ -143,7 +148,9 @@ class MockController(Node):
         while point_idx < len(traj.points):
             elapsed = time.time() - start_time
             point = traj.points[point_idx]
-            point_time = point.time_from_start.sec + point.time_from_start.nanosec * 1e-9
+            point_time = (
+                point.time_from_start.sec + point.time_from_start.nanosec * 1e-9
+            )
 
             if elapsed >= point_time:
                 # Update positions
@@ -186,14 +193,29 @@ class MockController(Node):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Mock trajectory controller with RViz2 support")
-    parser.add_argument("--urdf", type=str, help="URDF file (enables robot visualization)")
-    parser.add_argument("--joints", type=str, nargs="+",
-                        default=["shoulder_pan_joint", "shoulder_lift_joint", "elbow_joint",
-                                 "wrist_1_joint", "wrist_2_joint", "wrist_3_joint"],
-                        help="Joint names (default: UR5 joints)")
-    parser.add_argument("--gripper", action="store_true",
-                        help="Enable mock gripper action server")
+    parser = argparse.ArgumentParser(
+        description="Mock trajectory controller with RViz2 support"
+    )
+    parser.add_argument(
+        "--urdf", type=str, help="URDF file (enables robot visualization)"
+    )
+    parser.add_argument(
+        "--joints",
+        type=str,
+        nargs="+",
+        default=[
+            "shoulder_pan_joint",
+            "shoulder_lift_joint",
+            "elbow_joint",
+            "wrist_1_joint",
+            "wrist_2_joint",
+            "wrist_3_joint",
+        ],
+        help="Joint names (default: UR5 joints)",
+    )
+    parser.add_argument(
+        "--gripper", action="store_true", help="Enable mock gripper action server"
+    )
     args = parser.parse_args()
 
     # Read URDF if provided

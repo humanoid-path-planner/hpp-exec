@@ -24,9 +24,12 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import Callable, List
+from typing import TYPE_CHECKING, Callable, List
 
 import numpy as np
+
+if TYPE_CHECKING:
+    from hpp_exec.ros2_sender import Segment
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +37,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Data classes
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class GraspTransition:
@@ -65,6 +69,7 @@ class GraspTransition:
 # ---------------------------------------------------------------------------
 # Constraint graph state parsing
 # ---------------------------------------------------------------------------
+
 
 def _parse_grasps_from_state_name(state_name: str) -> set[str]:
     """Extract active grasp descriptions from an HPP constraint graph state name.
@@ -118,12 +123,14 @@ def extract_grasp_transitions(
         grasps = _parse_grasps_from_state_name(state)
 
         if grasps != prev_grasps:
-            transitions.append(GraspTransition(
-                config_index=i,
-                time=times[i],
-                grasps_before=prev_grasps,
-                grasps_after=grasps,
-            ))
+            transitions.append(
+                GraspTransition(
+                    config_index=i,
+                    time=times[i],
+                    grasps_before=prev_grasps,
+                    grasps_after=grasps,
+                )
+            )
             prev_grasps = grasps
 
     return transitions
@@ -132,6 +139,7 @@ def extract_grasp_transitions(
 # ---------------------------------------------------------------------------
 # Segment builder from constraint graph
 # ---------------------------------------------------------------------------
+
 
 def segments_from_graph(
     configs: List[np.ndarray],
