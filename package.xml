@@ -10,4 +10,10 @@
   <author>Paul Sardin</author>
 
   <exec_depend>hpp-python</exec_depend>
+  <exec_depend>pyhpp</exec_depend>
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>trajectory_msgs</exec_depend>
+  <exec_depend>control_msgs</exec_depend>
+  <exec_depend>action_msgs</exec_depend>
+  <exec_depend>builtin_interfaces</exec_depend>
 </package>
