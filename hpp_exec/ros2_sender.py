@@ -93,6 +93,14 @@ class _TrajectorySenderNode(Node):
             self.get_logger().error("Trajectory execution timed out")
             return False
 
+        if result.result.error_code != FollowJointTrajectory.Result.SUCCESSFUL:
+            self.get_logger().error(
+                "Trajectory execution failed with error code %d: %s",
+                result.result.error_code,
+                result.result.error_string,
+            )
+            return False
+
         self.get_logger().info("Trajectory execution complete")
         return True
 
