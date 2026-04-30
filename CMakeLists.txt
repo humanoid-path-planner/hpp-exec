@@ -39,6 +39,8 @@ endif()
 include("${JRL_CMAKE_MODULES}/hpp.cmake")
 include("${JRL_CMAKE_MODULES}/python.cmake")
 
+set(PROJECT_USE_CMAKE_EXPORT TRUE)
+
 compute_project_args(PROJECT_ARGS LANGUAGES CXX)
 project(${PROJECT_NAME} ${PROJECT_ARGS})
 
@@ -51,3 +53,8 @@ python_install_on_site("hpp_exec" "__init__.py")
 python_install_on_site("hpp_exec" "trajectory_utils.py")
 python_install_on_site("hpp_exec" "ros2_sender.py")
 python_install_on_site("hpp_exec" "gripper.py")
+
+# Interface target so hpp-doc and other consumers can find_package(hpp-exec)
+# and so doc/Doxyfile.extra.in is picked up by the JRL doxygen macros.
+add_library(${PROJECT_NAME} INTERFACE)
+install(TARGETS ${PROJECT_NAME} EXPORT ${TARGETS_EXPORT_NAME} DESTINATION lib)

@@ -24,16 +24,33 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 # ---------------------------------------------------------------------------
 
 
+class MockTransition:
+    def __init__(self, name: str, state_from: str, state_to: str):
+        self._name = name
+        self.state_from = state_from
+        self.state_to = state_to
+
+    def name(self):
+        return self._name
+
+
 class MockConstraintGraph:
     """Simulates HPP constraint graph state queries."""
 
-    def __init__(self, transitions: dict[int, str]):
+    def __init__(
+        self,
+        transitions: dict[int, str],
+        transition_names: dict[tuple[str, str], str] | None = None,
+    ):
         """
         Args:
             transitions: {config_index: state_name} mapping.
                 Waypoints before the first key are "free".
+            transition_names: optional {(state_from, state_to): transition_name}
+                mapping, used to simulate pyhpp graph transition metadata.
         """
         self.transitions = sorted(transitions.items())
+        self.transition_names = transition_names or {}
 
     def getStateFromConfiguration(self, config):
         # Use first element as config identifier
@@ -45,6 +62,15 @@ class MockConstraintGraph:
             else:
                 break
         return state
+
+    def getTransitions(self):
+        return [
+            MockTransition(name, state_from, state_to)
+            for (state_from, state_to), name in self.transition_names.items()
+        ]
+
+    def getNodesConnectedByTransition(self, transition):
+        return (transition.state_from, transition.state_to)
 
 
 # ---------------------------------------------------------------------------
@@ -77,6 +103,8 @@ def test_single_grasp():
     assert transitions[0].config_index == 5
     assert transitions[0].acquired == {"gripper grasps box/handle"}
     assert transitions[0].released == set()
+    assert transitions[0].state_before == "free"
+    assert transitions[0].state_after == "gripper grasps box/handle"
 
 
 def test_grasp_and_release():
@@ -104,6 +132,97 @@ def test_grasp_and_release():
     assert transitions[1].config_index == 20
     assert transitions[1].acquired == set()
     assert transitions[1].released == {"gripper grasps box/handle"}
+
+
+def test_transition_name_disambiguates_combined_state():
+    """g1 -> g1+g2 should be identified by the transition that acquired g2."""
+    from hpp_exec.gripper import extract_grasp_transitions
+
+    configs = [np.array([float(i)]) for i in range(30)]
+    times = [float(i) for i in range(30)]
+    graph = MockConstraintGraph(
+        {
+            10: "g1",
+            20: "g1+g2",
+        },
+        transition_names={
+            ("free", "g1"): "left/gripper > box1/handle | f_01",
+            ("g1", "g1+g2"): "right/gripper > box2/handle | 1_12",
+        },
+    )
+
+    transitions = extract_grasp_transitions(configs, times, graph)
+    assert len(transitions) == 2
+
+    assert transitions[0].transition_name == "left/gripper > box1/handle | f_01"
+    assert transitions[0].acquired == {"left/gripper grasps box1/handle"}
+    assert transitions[0].released == set()
+
+    assert transitions[1].state_before == "g1"
+    assert transitions[1].state_after == "g1+g2"
+    assert transitions[1].transition_name == "right/gripper > box2/handle | 1_12"
+    assert transitions[1].acquired == {"right/gripper grasps box2/handle"}
+    assert transitions[1].released == set()
+
+
+def test_transition_name_disambiguates_release_from_combined_state():
+    """g1+g2 -> g1 should be identified by the transition that released g2."""
+    from hpp_exec.gripper import extract_grasp_transitions
+
+    configs = [np.array([float(i)]) for i in range(30)]
+    times = [float(i) for i in range(30)]
+    graph = MockConstraintGraph(
+        {
+            10: "g1+g2",
+            20: "g1",
+        },
+        transition_names={
+            ("free", "g1+g2"): "left/gripper > box1/handle | f_01",
+            ("g1+g2", "g1"): "right/gripper < box2/handle | 12_1",
+        },
+    )
+
+    transitions = extract_grasp_transitions(configs, times, graph)
+    assert len(transitions) == 2
+    assert transitions[1].transition_name == "right/gripper < box2/handle | 12_1"
+    assert transitions[1].acquired == set()
+    assert transitions[1].released == {"right/gripper grasps box2/handle"}
+
+
+def test_transition_name_parsing_helpers():
+    """Transition names produce stable acquired/released grasp labels."""
+    from hpp_exec.gripper import _parse_grasp_event_from_transition_name
+
+    acquired, released = _parse_grasp_event_from_transition_name(
+        "left/gripper > box1/handle | f_01"
+    )
+    assert acquired == {"left/gripper grasps box1/handle"}
+    assert released == set()
+
+    acquired, released = _parse_grasp_event_from_transition_name(
+        "right/gripper < box2/handle | 12_1"
+    )
+    assert acquired == set()
+    assert released == {"right/gripper grasps box2/handle"}
+
+    acquired, released = _parse_grasp_event_from_transition_name("free loop | f")
+    assert acquired == set()
+    assert released == set()
+
+
+def test_fallback_keeps_state_diff_when_transition_metadata_is_absent():
+    """Old/mock graphs without transition metadata still work."""
+    from hpp_exec.gripper import extract_grasp_transitions
+
+    configs = [np.array([float(i)]) for i in range(12)]
+    times = [float(i) for i in range(12)]
+    graph = MockConstraintGraph({6: "gripper grasps box/handle"})
+
+    transitions = extract_grasp_transitions(configs, times, graph)
+    assert len(transitions) == 1
+    assert transitions[0].transition_name is None
+    assert transitions[0].acquired == {"gripper grasps box/handle"}
+    assert transitions[0].released == set()
 
 
 def test_empty_configs():
@@ -204,6 +323,159 @@ def test_segments_pick_and_place():
     segments[2].pre_actions[0]()
     assert len(close_called) == 1
     assert len(open_called) == 1
+
+
+def test_segments_accept_transition_aware_action():
+    """on_grasp/on_release may inspect the unique graph transition."""
+    from hpp_exec.gripper import segments_from_graph
+
+    configs = [np.array([float(i)]) for i in range(20)]
+    times = [float(i) for i in range(20)]
+    graph = MockConstraintGraph(
+        {10: "g1"},
+        transition_names={
+            ("free", "g1"): "left/gripper > box1/handle | f_01",
+        },
+    )
+    seen = []
+
+    def on_grasp(transition):
+        seen.append(transition.transition_name)
+        return True
+
+    segments = segments_from_graph(
+        configs,
+        times,
+        graph,
+        on_grasp=on_grasp,
+        on_release=lambda: True,
+    )
+
+    segments[1].pre_actions[0]()
+    assert seen == ["left/gripper > box1/handle | f_01"]
+
+
+def test_segments_accept_action_mapping_by_transition_name():
+    """Transition-name mappings let different grasps run different actions."""
+    from hpp_exec.gripper import segments_from_graph
+
+    configs = [np.array([float(i)]) for i in range(30)]
+    times = [float(i) for i in range(30)]
+    graph = MockConstraintGraph(
+        {
+            10: "g1",
+            20: "g1+g2",
+        },
+        transition_names={
+            ("free", "g1"): "left/gripper > box1/handle | f_01",
+            ("g1", "g1+g2"): "right/gripper > box2/handle | 1_12",
+        },
+    )
+    calls = []
+
+    segments = segments_from_graph(
+        configs,
+        times,
+        graph,
+        on_grasp={
+            "left/gripper > box1/handle | f_01": (
+                lambda: calls.append("left") or True
+            ),
+            "right/gripper > box2/handle | 1_12": (
+                lambda: calls.append("right") or True
+            ),
+        },
+        on_release=lambda: True,
+    )
+
+    segments[1].pre_actions[0]()
+    segments[2].pre_actions[0]()
+    assert calls == ["left", "right"]
+
+
+def test_segments_accept_action_mapping_by_grasp_label():
+    """Action maps can be keyed by parsed grasp label, not only edge name."""
+    from hpp_exec.gripper import segments_from_graph
+
+    configs = [np.array([float(i)]) for i in range(20)]
+    times = [float(i) for i in range(20)]
+    graph = MockConstraintGraph(
+        {10: "g1"},
+        transition_names={
+            ("free", "g1"): "left/gripper > box1/handle | f_01",
+        },
+    )
+    calls = []
+
+    segments = segments_from_graph(
+        configs,
+        times,
+        graph,
+        on_grasp={
+            "left/gripper grasps box1/handle": lambda: calls.append("left") or True,
+        },
+        on_release=lambda: True,
+    )
+
+    segments[1].pre_actions[0]()
+    assert calls == ["left"]
+
+
+def test_segments_accept_action_mapping_by_state_pair():
+    """State-pair keys cover custom transition names with state-name fallback."""
+    from hpp_exec.gripper import segments_from_graph
+
+    configs = [np.array([float(i)]) for i in range(20)]
+    times = [float(i) for i in range(20)]
+    graph = MockConstraintGraph(
+        {10: "gripper grasps box/handle"},
+        transition_names={
+            ("free", "gripper grasps box/handle"): "custom transition",
+        },
+    )
+    calls = []
+
+    segments = segments_from_graph(
+        configs,
+        times,
+        graph,
+        on_grasp={
+            "free -> gripper grasps box/handle": (
+                lambda: calls.append("state-pair") or True
+            ),
+        },
+        on_release=lambda: True,
+    )
+
+    segments[1].pre_actions[0]()
+    assert calls == ["state-pair"]
+
+
+def test_segments_action_mapping_missing_key_raises():
+    """A mapping should fail loudly when no key matches the graph transition."""
+    from hpp_exec.gripper import segments_from_graph
+
+    configs = [np.array([float(i)]) for i in range(20)]
+    times = [float(i) for i in range(20)]
+    graph = MockConstraintGraph(
+        {10: "g1"},
+        transition_names={
+            ("free", "g1"): "left/gripper > box1/handle | f_01",
+        },
+    )
+
+    try:
+        segments_from_graph(
+            configs,
+            times,
+            graph,
+            on_grasp={"right/gripper > box2/handle | f_01": lambda: True},
+            on_release=lambda: True,
+        )
+    except KeyError as exc:
+        assert "No action found" in str(exc)
+    else:
+        raise AssertionError("segments_from_graph should fail for an unknown action key")
 
 
 # ---------------------------------------------------------------------------
