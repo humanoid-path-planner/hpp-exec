@@ -13,6 +13,11 @@ The official tutorials for this package are in [hpp_tutorial](https://github.com
 - **Tutorial 6**: Plan a simple arm motion and execute on Gazebo via `send_trajectory()`
 - **Tutorial 7**: Pick-and-place with gripper actions using `segments_from_graph()` and `execute_segments()`
 
+## Documentation
+
+- [Generated Doxygen documentation](https://gepetto.github.io/doc/hpp-exec/doxygen-html/index.html):
+  user reference for the API, execution model, and troubleshooting.
+
 ## Creating configs and times from HPP
 
 After planning and time parameterization with HPP, you have a `Path` object that maps time (seconds) to robot configurations. Sample it at regular intervals to get discrete configs:
@@ -67,21 +72,34 @@ cd ~/devel/src && make all
 ### API
 
 ```python
-from hpp_exec import send_trajectory, configs_to_joint_trajectory
+from hpp_exec import (
+    Segment,
+    execute_segments,
+    send_trajectory,
+    segments_from_graph,
+)
 
 # Main function - send trajectory to ros2_control
 send_trajectory(
     configs,              # List[np.ndarray] from HPP
-    times,                  # List[float] path parameter values
+    times,                # List[float] timestamps or path parameter values
     joint_names,            # List[str] ROS2 joint names
-    max_velocity=1.0,       # Rescale times to respect velocity limit
-    max_acceleration=0.5,   # Rescale times to respect acceleration limit
+    time_parameterization="none",  # "none" for seconds, "trapezoidal" to rescale
     controller_topic="...", # FollowJointTrajectory action topic
 )
 
-# Lower-level conversion
-trajectory = configs_to_joint_trajectory(configs, times, joint_names)
+# Split a manipulation path into executable pieces.
+segments = segments_from_graph(
+    configs, times, graph,
+    on_grasp=close_gripper,
+    on_release=open_gripper,
+)
+execute_segments(segments, configs, times, joint_names)
 ```
+
+See the generated Doxygen documentation for `send_trajectory_async()`,
+`configs_to_joint_trajectory()`, `add_time_parameterization()`, and other
+lower-level helpers.
 
 ## Examples
 
@@ -111,7 +129,6 @@ hpp-exec/
 ├── examples/              # Usage examples (Gazebo + real hardware)
 ├── scripts/               # Launch scripts for Gazebo
 ├── robots/                # URDF/SRDF for examples
-├── docs/                  # Architecture documentation
 ├── docker/
 ├── Dockerfile
 └── run.sh

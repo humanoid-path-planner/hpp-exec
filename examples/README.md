@@ -46,4 +46,6 @@ python3 examples/pick_and_place_franka.py
 
 ## API Documentation
 
-See [docs/API.md](../docs/API.md) for the full API reference.
+See the
+[generated Doxygen documentation](https://gepetto.github.io/doc/hpp-exec/doxygen-html/index.html)
+for the full API reference.
