@@ -19,7 +19,7 @@
 /// The package source code is on
 /// <a href="https://github.com/humanoid-path-planner/hpp-exec">GitHub</a>.
 /// End-to-end examples are provided as tutorials 6 and 7 of
-/// <a href="https://github.com/humanoid-path-planner/hpp_tutorial">hpp_tutorial</a>.
+/// <a href="https://github.com/humanoid-path-planner/hpp-tutorial">hpp-tutorial</a>.
 ///
 /// \section hpp_exec_workflow Typical workflow
 ///
