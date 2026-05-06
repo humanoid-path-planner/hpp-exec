@@ -41,7 +41,7 @@ from pyhpp.manipulation import (
 from pyhpp.manipulation.constraint_graph_factory import ConstraintGraphFactory
 
 from hpp_exec import execute_segments
-from hpp_exec.gripper import extract_grasp_transitions, segments_from_graph
+from hpp_exec.gripper import extract_grasp_transitions, segments_from_path_graph
 
 # ---------------------------------------------------------------------------
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -240,15 +240,6 @@ def main():
     if path is None:
         return 1
 
-    full_configs, arm_configs, times = extract_configs(path)
-
-    # --- Detect grasp transitions (for logging) ---
-    transitions = extract_grasp_transitions(full_configs, times, cg)
-    print(f"\nGrasp transitions: {len(transitions)}")
-    for t in transitions:
-        action = "CLOSE" if t.acquired else "OPEN"
-        print(f"  t={t.time:.2f}s (config {t.config_index}): {action}")
-
     # --- Gripper controller (FR3-specific) ---
     gripper = JointTrajectoryGripperController(
         topic="/gripper_controller/follow_joint_trajectory",
@@ -258,14 +249,20 @@ def main():
         duration=1.0,
     )
 
-    # --- Build segments from constraint graph ---
-    segments = segments_from_graph(
-        full_configs,
-        times,
+    # --- Sample path and build segments from graph transitions ---
+    full_configs, times, segments = segments_from_path_graph(
+        path,
         cg,
         on_grasp=gripper.close,
         on_release=gripper.open,
     )
+
+    # --- Detect grasp transitions (for logging) ---
+    transitions = extract_grasp_transitions(full_configs, times, cg)
+    print(f"\nSampled-state grasp transitions: {len(transitions)}")
+    for t in transitions:
+        action = "CLOSE" if t.acquired else "OPEN"
+        print(f"  t={t.time:.2f}s (config {t.config_index}): {action}")
 
     # --- Execute ---
     print(f"\nExecuting {len(segments)} segments on Gazebo...")

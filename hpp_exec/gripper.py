@@ -26,7 +26,7 @@ import inspect
 import logging
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Callable, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Callable, Dict, Iterable, List, Optional, Tuple
 
 import numpy as np
 
@@ -82,6 +82,19 @@ class GraspTransition:
         if not self.acquired and not self.released:
             self.acquired = self.grasps_after - self.grasps_before
             self.released = self.grasps_before - self.grasps_after
+
+
+@dataclass
+class _PathTransitionInterval:
+    start_param: float
+    end_param: float
+    state_before: str
+    state_after: str
+    transition_name: Optional[str]
+
+    @property
+    def identity(self) -> tuple[Optional[str], str, str]:
+        return (self.transition_name, self.state_before, self.state_after)
 
 
 # ---------------------------------------------------------------------------
@@ -257,22 +270,12 @@ def extract_grasp_transitions(
     times: List[float],
     graph,
 ) -> List[GraspTransition]:
-    """Detect grasp/release events by querying the HPP constraint graph.
-
-    For each config, queries the constraint graph state. When the state changes
-    between consecutive configs, the transition crossed between those states is
-    used to identify the grasp/release event. This is more precise than using
-    the destination state alone because states can encode combinations such as
-    "g1+g2". If transition metadata is unavailable, the function falls back to
-    comparing active-grasp sets parsed from state names.
+    """Detect grasp/release events along sampled configurations.
 
     Args:
         configs: HPP configuration vectors along the path.
         times: Corresponding timestamps.
-        graph: HPP manipulation constraint graph (pyhpp.manipulation.Graph).
-            Must have getStateFromConfiguration(q). If it also provides
-            getTransitions() and getNodesConnectedByTransition(edge), transition
-            names are used to identify grasp/release events.
+        graph: HPP manipulation graph.
 
     Returns:
         Ordered list of GraspTransition at each state change.
@@ -375,3 +378,223 @@ def segments_from_graph(
         segments.append(Segment(start, end, pre_actions=pre_actions))
 
     return segments
+
+
+# ---------------------------------------------------------------------------
+# Path-aware segment builder from constraint graph transitions
+# ---------------------------------------------------------------------------
+
+
+_PARAM_EPS = 1e-9
+
+
+def _transition_name(transition) -> Optional[str]:
+    name = getattr(transition, "name", None)
+    if callable(name):
+        return name()
+    if name is not None:
+        return str(name)
+    return None
+
+
+def _path_length(path) -> float:
+    length = getattr(path, "length", None)
+    if not callable(length):
+        raise TypeError("path must provide length()")
+    return float(length())
+
+
+def _is_path_vector(path) -> bool:
+    return callable(getattr(path, "numberPaths", None)) and callable(
+        getattr(path, "pathAtRank", None)
+    )
+
+
+def _flatten_path_vector(path) -> list:
+    subpaths = []
+    for rank in range(int(path.numberPaths())):
+        subpath = path.pathAtRank(rank)
+        if _is_path_vector(subpath):
+            subpaths.extend(_flatten_path_vector(subpath))
+        else:
+            subpaths.append(subpath)
+    return subpaths
+
+
+def _path_subintervals(path) -> list[tuple[float, float]]:
+    if not _is_path_vector(path):
+        raise TypeError("path must be an HPP PathVector")
+
+    subpaths = _flatten_path_vector(path)
+    if not subpaths:
+        return []
+
+    intervals = []
+    cursor = 0.0
+    for subpath in subpaths:
+        length = _path_length(subpath)
+        start = cursor
+        end = start + length
+        if end - start > _PARAM_EPS:
+            intervals.append((start, end))
+        cursor = end
+    return intervals
+
+
+def _extract_path_transition_intervals(path, graph) -> list[_PathTransitionInterval]:
+    intervals: list[_PathTransitionInterval] = []
+    for start, end in _path_subintervals(path):
+        midpoint = start + 0.5 * (end - start)
+        transition = graph.transitionAtParam(path, midpoint)
+        state_before, state_after = graph.getNodesConnectedByTransition(transition)
+        interval = _PathTransitionInterval(
+            start_param=start,
+            end_param=end,
+            state_before=state_before,
+            state_after=state_after,
+            transition_name=_transition_name(transition),
+        )
+
+        if intervals and intervals[-1].identity == interval.identity:
+            intervals[-1].end_param = interval.end_param
+        else:
+            intervals.append(interval)
+
+    return intervals
+
+
+def _uniform_sample_params(length: float, n_per_unit: int, min_samples: int) -> list[float]:
+    if length <= _PARAM_EPS:
+        return [0.0]
+
+    n_samples = max(int(length * n_per_unit), min_samples)
+    n_samples = max(n_samples, 1)
+    return [(i / n_samples) * length for i in range(n_samples + 1)]
+
+
+def _dedupe_params(params: Iterable[float], length: float) -> list[float]:
+    bounded = [min(max(float(p), 0.0), length) for p in params]
+    ordered = sorted(bounded)
+
+    deduped: list[float] = []
+    for param in ordered:
+        if deduped and abs(param - deduped[-1]) <= _PARAM_EPS:
+            continue
+        deduped.append(param)
+    return deduped
+
+
+def _sample_path_at(path, param: float) -> np.ndarray:
+    result = path(param)
+    if isinstance(result, tuple):
+        config, success = result
+        if not success:
+            raise RuntimeError(f"path evaluation failed at parameter {param}")
+    else:
+        config = result
+    return np.array(config)
+
+
+def _find_param_index(times: list[float], param: float) -> int:
+    for index, time in enumerate(times):
+        if abs(time - param) <= _PARAM_EPS:
+            return index
+    raise ValueError(f"parameter {param} was not sampled")
+
+
+def _transition_from_interval(
+    interval: _PathTransitionInterval,
+    config_index: int,
+) -> GraspTransition:
+    grasps_before = _parse_grasps_from_state_name(interval.state_before)
+    grasps_after = _parse_grasps_from_state_name(interval.state_after)
+    acquired, released = _parse_grasp_event_from_transition_name(
+        interval.transition_name
+    )
+    transition = GraspTransition(
+        config_index=config_index,
+        time=interval.start_param,
+        state_before=interval.state_before,
+        state_after=interval.state_after,
+        transition_name=interval.transition_name,
+        grasps_before=grasps_before,
+        grasps_after=grasps_after,
+        acquired=acquired,
+        released=released,
+    )
+    if interval.transition_name and not acquired and not released:
+        transition.acquired = set()
+        transition.released = set()
+    return transition
+
+
+def segments_from_path_graph(
+    path,
+    graph,
+    on_grasp: ActionSpec,
+    on_release: ActionSpec,
+    *,
+    n_per_unit: int = 50,
+    min_samples: int = 50,
+    sample_params: Optional[Iterable[float]] = None,
+) -> Tuple[List[np.ndarray], List[float], List["Segment"]]:
+    """Sample an HPP manipulation path and split it at graph transitions.
+
+    Args:
+        path: HPP manipulation path.
+        graph: HPP manipulation graph.
+        on_grasp: Action to run before intervals that acquire a grasp.
+        on_release: Action to run before intervals that release a grasp.
+        n_per_unit: Number of regular samples per path-parameter unit.
+        min_samples: Minimum number of regular samples.
+        sample_params: Optional path parameters to use instead of regular sampling.
+
+    Returns:
+        ``(configs, times, segments)``. ``times`` are geometric path parameters.
+    """
+    from hpp_exec.ros2_sender import Segment
+
+    length = _path_length(path)
+    intervals = _extract_path_transition_intervals(path, graph)
+
+    if sample_params is None:
+        params = _uniform_sample_params(length, n_per_unit, min_samples)
+    else:
+        params = list(sample_params)
+
+    boundary_params = [0.0, length]
+    for interval in intervals:
+        boundary_params.extend((interval.start_param, interval.end_param))
+
+    times = _dedupe_params([*params, *boundary_params], length)
+    configs = [_sample_path_at(path, param) for param in times]
+
+    if not intervals:
+        return configs, times, [Segment(0, len(configs))]
+
+    segments = []
+    for interval in intervals:
+        start_index = _find_param_index(times, interval.start_param)
+        end_index = _find_param_index(times, interval.end_param)
+        if end_index <= start_index:
+            continue
+
+        transition = _transition_from_interval(interval, start_index)
+        pre_actions = []
+        if transition.acquired:
+            pre_actions.append(
+                _resolve_action(on_grasp, transition, transition.acquired)
+            )
+        if transition.released:
+            pre_actions.append(
+                _resolve_action(on_release, transition, transition.released)
+            )
+
+        segments.append(
+            Segment(start_index, end_index + 1, pre_actions=pre_actions)
+        )
+
+    if not segments:
+        segments.append(Segment(0, len(configs)))
+
+    return configs, times, segments

@@ -25,6 +25,7 @@ from hpp_exec.gripper import (
     GraspTransition,
     extract_grasp_transitions,
     segments_from_graph,
+    segments_from_path_graph,
 )
 from hpp_exec.ros2_sender import (
     Segment,
@@ -47,6 +48,7 @@ __all__ = [
     "add_time_parameterization",
     "extract_joint_config",
     "segments_from_graph",
+    "segments_from_path_graph",
     "extract_grasp_transitions",
     "GraspTransition",
 ]

@@ -48,7 +48,7 @@ from pyhpp.manipulation import (
 from pyhpp.manipulation.constraint_graph_factory import ConstraintGraphFactory
 
 from hpp_exec import execute_segments
-from hpp_exec.gripper import extract_grasp_transitions, segments_from_graph
+from hpp_exec.gripper import extract_grasp_transitions, segments_from_path_graph
 
 # ---------------------------------------------------------------------------
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -247,15 +247,6 @@ def main():
     if path is None:
         return 1
 
-    full_configs, arm_configs, times = extract_configs(path)
-
-    # --- Log transitions ---
-    transitions = extract_grasp_transitions(full_configs, times, cg)
-    print(f"\nGrasp transitions: {len(transitions)}")
-    for t in transitions:
-        action = "GRASP" if t.acquired else "RELEASE"
-        print(f"  t={t.time:.2f}s (config {t.config_index}): {action}")
-
     # --- Franka gripper (real hardware) ---
     gripper = FrankaGripperController(
         arm_id="fr3",
@@ -265,14 +256,20 @@ def main():
         grasp_speed=0.05,  # m/s
     )
 
-    # --- Build segments from constraint graph ---
-    segments = segments_from_graph(
-        full_configs,
-        times,
+    # --- Sample path and build segments from graph transitions ---
+    full_configs, times, segments = segments_from_path_graph(
+        path,
         cg,
         on_grasp=gripper.close,
         on_release=gripper.open,
     )
+
+    # --- Log transitions ---
+    transitions = extract_grasp_transitions(full_configs, times, cg)
+    print(f"\nSampled-state grasp transitions: {len(transitions)}")
+    for t in transitions:
+        action = "GRASP" if t.acquired else "RELEASE"
+        print(f"  t={t.time:.2f}s (config {t.config_index}): {action}")
 
     # --- Execute ---
     print(f"\nExecuting {len(segments)} segments on real FR3...")
