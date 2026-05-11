@@ -172,16 +172,17 @@ def plan_pick_and_place():
     factory.setObjects(["cube"], [["cube/handle"]], [[]])
     factory.generate()
 
-    try:
-        e = cg.getTransition("fr3/gripper > cube/handle | f_23")
-        cg.addNumericalConstraintsToTransition(e, [constraints["place_cube/complement"]])
-    except RuntimeError:
-        pass
-    try:
-        e = cg.getTransition("fr3/gripper < cube/handle | 0-0_32")
-        cg.addNumericalConstraintsToTransition(e, [constraints["place_cube/complement"]])
-    except RuntimeError:
-        pass
+    for transition_name in (
+        "fr3/gripper > cube/handle | f_23",
+        "fr3/gripper < cube/handle | 0-0_32",
+    ):
+        try:
+            edge = cg.getTransition(transition_name)
+        except RuntimeError:
+            continue
+        cg.addNumericalConstraintsToTransition(
+            edge, [constraints["place_cube/complement"]]
+        )
 
     problem.steeringMethod = Straight(problem)
     problem.pathValidation = Dichotomy(robot, 0)
@@ -223,22 +224,6 @@ def plan_pick_and_place():
     elapsed = time.time() - start
     print(f"  Solved in {elapsed:.1f}s, path length: {path.length():.3f}")
     return robot, problem, cg, path
-
-
-def extract_configs(path, n_per_unit=50):
-    """Sample full and arm-only configs from an HPP path."""
-    n_samples = max(int(path.length() * n_per_unit), 50)
-    full_configs = []
-    arm_configs = []
-    times = []
-    for i in range(n_samples + 1):
-        t = (i / n_samples) * path.length()
-        q, success = path(t)
-        if success:
-            full_configs.append(np.array(q))
-            arm_configs.append(np.array(q[:7]))
-            times.append(t)
-    return full_configs, arm_configs, times
 
 
 def main():

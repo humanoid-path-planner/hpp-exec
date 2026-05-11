@@ -19,7 +19,7 @@ Usage (in terminal 2):
     PYTHONPATH=$HOME/devel/hpp-exec:$PYTHONPATH python3 ~/devel/hpp-exec/scripts/test_gripper_gazebo.py
 """
 
-# Import from examples/ — add to path if needed
+# Import from examples/ if needed.
 import os
 import sys
 

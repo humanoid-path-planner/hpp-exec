@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-FR3 Pick-and-Place — Real Hardware with HPP Time Parameterization
+FR3 Pick-and-Place -- Real Hardware with HPP Time Parameterization
 =================================================================
 
 Self-contained script: plans a pick-and-place with HPP manipulation,
@@ -195,21 +195,18 @@ def plan_pick_and_place():
     factory.setObjects(["cube"], [["cube/handle"]], [[]])
     factory.generate()
 
-    # Complement on preplace↔grasps transitions
-    try:
-        e = cg.getTransition("fr3/gripper > cube/handle | f_23")
+    # Complement on preplace/grasp transitions
+    for transition_name in (
+        "fr3/gripper > cube/handle | f_23",
+        "fr3/gripper < cube/handle | 0-0_32",
+    ):
+        try:
+            edge = cg.getTransition(transition_name)
+        except RuntimeError:
+            continue
         cg.addNumericalConstraintsToTransition(
-            e, [constraints["place_cube/complement"]]
+            edge, [constraints["place_cube/complement"]]
         )
-    except RuntimeError:
-        pass
-    try:
-        e = cg.getTransition("fr3/gripper < cube/handle | 0-0_32")
-        cg.addNumericalConstraintsToTransition(
-            e, [constraints["place_cube/complement"]]
-        )
-    except RuntimeError:
-        pass
 
     problem.steeringMethod = Straight(problem)
     problem.pathValidation = Dichotomy(robot, 0)
@@ -295,7 +292,7 @@ def main():
 
     # --- Time parameterization via HPP ---
     # Order 2 = 5th-order polynomial: zero velocity AND acceleration
-    # at segment boundaries → smoothest motion.
+    # at segment boundaries for the smoothest motion.
     problem.setParameter("SimpleTimeParameterization/order", 2)
     problem.setParameter("SimpleTimeParameterization/maxAcceleration", 1.0)
     # safety < 1.0 scales down velocities (0.5 = use 50% of joint limits)

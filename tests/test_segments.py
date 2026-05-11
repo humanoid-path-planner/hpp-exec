@@ -1,20 +1,8 @@
-#!/usr/bin/env python3
 """
 Unit tests for segment-based execution logic.
-
-Usage:
-    python3 -m pytest tests/test_segments.py -v
-    # or simply:
-    python3 tests/test_segments.py
 """
 
-import os
-import sys
-
 import numpy as np
-
-# Allow running from repo root without install
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 
 class MockTransition:
@@ -159,7 +147,7 @@ def test_segments_no_grasp_transitions():
 
 
 def test_segments_from_graph_inserts_transition_boundaries():
-    """transitionAtParam lets path splitting catch badly discretized waypoints."""
+    """Continuous path intervals are sampled at their exact graph boundaries."""
     from hpp_exec.gripper import segments_from_graph
 
     path = MockPathVector([4.8, 0.4, 4.8])
@@ -484,24 +472,3 @@ def test_parse_multi_grasp():
         "r_gripper grasps box/handle : l_gripper grasps cup/handle"
     )
     assert result == {"r_gripper grasps box/handle", "l_gripper grasps cup/handle"}
-
-
-# ---------------------------------------------------------------------------
-# Run
-# ---------------------------------------------------------------------------
-
-if __name__ == "__main__":
-    test_funcs = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
-    passed = 0
-    failed = 0
-    for func in test_funcs:
-        try:
-            func()
-            print(f"  PASS  {func.__name__}")
-            passed += 1
-        except Exception as e:
-            print(f"  FAIL  {func.__name__}: {e}")
-            failed += 1
-
-    print(f"\n{passed} passed, {failed} failed")
-    sys.exit(1 if failed else 0)

@@ -127,18 +127,18 @@ See [examples/README.md](examples/README.md) for all examples.
 
 ```
 hpp-exec/
-├── hpp_exec/           # Python package
-│   ├── __init__.py
-│   ├── segments.py        # Segment data structure
-│   ├── trajectory_utils.py # HPP config → ROS2 JointTrajectory conversion
-│   ├── ros2_sender.py     # send_trajectory() via FollowJointTrajectory action
-│   └── gripper.py         # Gripper coordination for manipulation trajectories
-├── examples/              # Usage examples (Gazebo + real hardware)
-├── scripts/               # Launch scripts for Gazebo
-├── robots/                # URDF/SRDF for examples
-├── docker/
-├── Dockerfile
-└── run.sh
+|-- hpp_exec/           # Python package
+|   |-- __init__.py
+|   |-- segments.py        # Segment data structure
+|   |-- trajectory_utils.py # HPP config to ROS2 JointTrajectory conversion
+|   |-- ros2_sender.py     # send_trajectory() via FollowJointTrajectory action
+|   `-- gripper.py         # Gripper coordination for manipulation trajectories
+|-- examples/              # Usage examples (Gazebo + real hardware)
+|-- scripts/               # Launch scripts for Gazebo
+|-- robots/                # URDF/SRDF for examples
+|-- docker/
+|-- Dockerfile
+`-- run.sh
 ```
 
 ## License

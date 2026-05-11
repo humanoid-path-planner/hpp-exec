@@ -19,17 +19,17 @@ Example:
     )
 """
 
-__version__ = "0.1.0"
-
-_ROS_MODULES = {"rclpy", "control_msgs", "trajectory_msgs", "builtin_interfaces"}
-_ROS_IMPORT_ERROR = None
-
 from hpp_exec.gripper import (
     GraspTransition,
     extract_path_grasp_transitions,
     segments_from_graph,
 )
 from hpp_exec.segments import Segment
+
+__version__ = "0.1.0"
+
+_ROS_MODULES = {"rclpy", "control_msgs", "trajectory_msgs", "builtin_interfaces"}
+_ROS_IMPORT_ERROR = None
 
 try:
     from hpp_exec.ros2_sender import (

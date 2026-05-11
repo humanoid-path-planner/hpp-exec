@@ -34,11 +34,11 @@ from control_msgs.action import FollowJointTrajectory
 from rclpy.action import ActionClient
 from rclpy.node import Node
 
+from hpp_exec.segments import Segment
 from hpp_exec.trajectory_utils import (
     add_time_parameterization,
     configs_to_joint_trajectory,
 )
-from hpp_exec.segments import Segment
 
 logger = logging.getLogger(__name__)
 
@@ -139,7 +139,7 @@ def send_trajectory(
         configs = [np.array(path(t)[0]) for t in np.linspace(0, path.length(), 100)]
         times = list(np.linspace(0, path.length(), 100))
 
-        # times are path parameters — use trapezoidal to convert to real time:
+        # times are path parameters; use trapezoidal to convert to real time:
         send_trajectory(
             configs, times,
             joint_names=["shoulder_pan", "shoulder_lift", "elbow", ...],
