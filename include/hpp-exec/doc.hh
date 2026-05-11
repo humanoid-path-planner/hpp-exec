@@ -32,7 +32,7 @@
 /// # 1. Plan with HPP (using pyhpp directly).
 /// path = problem.solve()
 ///
-/// # 2. Sample the path into discrete waypoints.
+/// # 2. Sample the path into waypoints.
 /// n = 100
 /// configs = [np.array(path(t * path.length() / n)[0]) for t in range(n + 1)]
 /// times   = [t * path.length() / n for t in range(n + 1)]
@@ -65,7 +65,7 @@
 ///     send_trajectory_async,
 ///     execute_segments,
 ///     segments_from_graph,
-///     extract_grasp_transitions,
+///     extract_path_grasp_transitions,
 ///     configs_to_joint_trajectory,
 ///     add_time_parameterization,
 ///     extract_joint_config,
@@ -133,16 +133,17 @@
 /// )
 ///
 /// segments_from_graph(
-///     configs: list[np.ndarray],
-///     times: list[float],
+///     path,
 ///     graph,
 ///     on_grasp: Callable[[], bool] | Callable[[GraspTransition], bool] | dict,
 ///     on_release: Callable[[], bool] | Callable[[GraspTransition], bool] | dict,
-/// ) -> list[Segment]
+///     n_per_unit: int = 50,
+///     min_samples: int = 50,
+///     sample_params: Iterable[float] | None = None,
+/// ) -> tuple[list[np.ndarray], list[float], list[Segment]]
 ///
-/// extract_grasp_transitions(
-///     configs: list[np.ndarray],
-///     times: list[float],
+/// extract_path_grasp_transitions(
+///     path,
 ///     graph,
 /// ) -> list[GraspTransition]
 /// \endcode
@@ -270,25 +271,33 @@
 ///
 /// Building segments by hand is fine when grasp/release points are known
 /// up front, but for paths produced by an HPP manipulation planner the
-/// boundaries are encoded in the constraint graph. The
-/// \c segments_from_graph helper queries the manipulation graph at
-/// every configuration along the path, detects when the graph state
-/// changes, identifies the transition crossed between the previous and new
-/// states, and splits the trajectory accordingly. The two action specs
+/// boundaries are encoded in the HPP \c PathVector and constraint graph.
+/// The \c segments_from_graph helper inspects each continuous subpath,
+/// asks the graph which transition owns it with
+/// <tt>graph.transitionAtParam(path, s)</tt>, and inserts every
+/// graph-transition boundary into the sampled waypoint list. It only splits
+/// execution segments at grasp/release boundaries, so no-action graph
+/// intervals remain in the same arm trajectory. The two action specs
 /// \c on_grasp and \c on_release (typically <tt>gripper.close</tt> and
-/// <tt>gripper.open</tt>) are then attached as \c pre_actions of the
-/// segments that begin with a grasp or release.
+/// <tt>gripper.open</tt>) are attached as \c pre_actions of the segments
+/// whose graph transition acquires or releases a grasp.
 ///
 /// \code{.py}
 /// from hpp_exec import execute_segments
 /// from hpp_exec.gripper import segments_from_graph
 ///
-/// segments = segments_from_graph(
-///     configs, times, graph,
+/// configs, times, segments = segments_from_graph(
+///     path, graph,
 ///     on_grasp=gripper.close,
 ///     on_release=gripper.open,
 /// )
-/// execute_segments(segments, configs, times, joint_names=[...])
+/// execute_segments(
+///     segments,
+///     configs,
+///     times,
+///     joint_names=[...],
+///     time_parameterization="trapezoidal",
+/// )
 /// \endcode
 ///
 /// Grasp identity comes from the graph transition name, e.g.
@@ -299,38 +308,33 @@
 /// transition, but the transition itself describes which grasp event just
 /// happened.
 ///
-/// The fallback path triggers when the graph object does not expose
-/// \c getTransitions() and \c getNodesConnectedByTransition(edge), or when
-/// no edge between the previous and new state can be uniquely identified
-/// (multiple edges connecting the same state pair). In those cases
-/// \c transition_name is left as \c None and \c acquired / \c released are
-/// derived by diffing the active-grasp sets parsed from the state names -
-/// the legacy behavior, accurate when each state name lists its grasps but
-/// ambiguous for combined states.
+/// If a transition name does not use the usual grasp/release syntax,
+/// \c acquired / \c released fall back to the difference between the active
+/// grasp sets parsed from \c state_before and \c state_after. This keeps
+/// custom edge names usable when the graph state names list their grasps.
 ///
-/// The lower-level \c extract_grasp_transitions function returns the raw
-/// transition objects without building segments, which is useful for
-/// diagnostics or for plugging in custom action logic. Each transition
-/// carries:
+/// The lower-level \c extract_path_grasp_transitions function returns the
+/// raw grasp/release transition objects without building segments, which is
+/// useful for diagnostics or for plugging in custom action logic. Each
+/// transition carries:
 ///
-/// \li \c config_index, \c time: where in the path the transition occurs.
+/// \li \c config_index, \c time: the sampled index and path parameter where
+///     the transition occurs. \c extract_path_grasp_transitions does not
+///     sample configs, so its \c config_index is \c -1.
 /// \li \c state_before, \c state_after: graph state names returned by
-///     \c graph.getStateFromConfiguration before and after the transition.
-/// \li \c transition_name: graph edge name when uniquely identifiable, else
-///     \c None.
+///     \c graph.getNodesConnectedByTransition(edge).
+/// \li \c transition_name: graph edge name.
 /// \li \c grasps_before, \c grasps_after: active-grasp sets parsed from the
-///     \c state_before / \c state_after names. These reflect the legacy
-///     state-name parsing and are kept for diagnostics; they may not match
-///     \c acquired / \c released in pathological state-name schemes.
+///     \c state_before / \c state_after names.
 /// \li \c acquired, \c released: the grasp events the segmentation logic
-///     attributes to this transition. Computed from \c transition_name when
-///     possible, otherwise from <tt>grasps_after - grasps_before</tt> and
-///     <tt>grasps_before - grasps_after</tt>.
+///     attributes to this transition. Computed from the active-grasp set
+///     difference when state names expose it, otherwise from
+///     \c transition_name for compact/custom state names.
 ///
 /// \subsection hpp_exec_grasps_initial Synchronizing the initial state
 ///
-/// \c segments_from_graph attaches actions only at segment boundaries,
-/// so the first segment has no pre-actions. If the real-world initial
+/// \c segments_from_graph attaches actions at graph-transition
+/// boundaries. If the real-world initial
 /// state of the gripper is uncertain (a previous run that aborted mid-
 /// trajectory, a simulator that spawned the fingers at an arbitrary
 /// pose), the arm will start moving with the gripper in whatever state
@@ -374,13 +378,19 @@
 ///
 /// \code{.py}
 /// gripper = FrankaGripperController("fr3")
-/// segments = segments_from_graph(
-///     configs, times, graph,
+/// configs, times, segments = segments_from_graph(
+///     path, graph,
 ///     on_grasp=gripper.close,
 ///     on_release=gripper.open,
 /// )
 /// segments[0].pre_actions.insert(0, gripper.open)
-/// execute_segments(segments, configs, times, joint_names=[...])
+/// execute_segments(
+///     segments,
+///     configs,
+///     times,
+///     joint_names=[...],
+///     time_parameterization="trapezoidal",
+/// )
 /// \endcode
 ///
 /// See \c examples/gripper_controllers.py for reference implementations of
@@ -392,8 +402,8 @@
 /// different graph transitions:
 ///
 /// \code{.py}
-/// segments = segments_from_graph(
-///     configs, times, graph,
+/// configs, times, segments = segments_from_graph(
+///     path, graph,
 ///     on_grasp={
 ///         "left/gripper > box1/handle | f_01": left_gripper.close,
 ///         "right/gripper > box2/handle | 1_12": right_gripper.close,
@@ -459,24 +469,24 @@
 /// will let the arm move before the gripper has reached its target.
 ///
 /// \par segments_from_graph returns a single segment
-/// No graph state change was detected along the path. Either HPP did not
-/// cross a manipulation transition, or the path was sampled too coarsely
-/// for \c graph.getStateFromConfiguration to see the change. Sample the
-/// path more densely and re-check.
+/// No grasp or release transition was found in the path. Either HPP did not
+/// cross a manipulation transition, or adjacent path intervals all map to
+/// the same graph transition.
 ///
 /// \section hpp_exec_code_map How the Python code is organized
 ///
 /// The package is intentionally small:
 ///
+/// \li \c segments.py defines the lightweight \c Segment data structure.
 /// \li \c trajectory_utils.py extracts selected joints from full HPP
 ///     configuration vectors and converts them to a ROS 2
 ///     \c JointTrajectory message.
 /// \li \c ros2_sender.py creates the \c FollowJointTrajectory action client,
 ///     sends the trajectory, waits for the result, and implements the
 ///     \c Segment / \c execute_segments loop.
-/// \li \c gripper.py reads HPP constraint-graph states, maps state changes
-///     back to graph transition names, detects grasp transitions, and turns
-///     them into executable \c Segment objects.
+/// \li \c gripper.py reads HPP path intervals and constraint-graph
+///     transitions, detects grasp events, samples the path at graph
+///     boundaries, and turns them into executable \c Segment objects.
 ///
 /// The important separation is that HPP remains responsible for planning and
 /// time parameterization, \c hpp-exec is responsible for packaging and

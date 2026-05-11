@@ -26,8 +26,7 @@ Example:
 """
 
 import logging
-from dataclasses import dataclass, field
-from typing import Callable, List, Optional
+from typing import List, Optional
 
 import numpy as np
 import rclpy
@@ -39,6 +38,7 @@ from hpp_exec.trajectory_utils import (
     add_time_parameterization,
     configs_to_joint_trajectory,
 )
+from hpp_exec.segments import Segment
 
 logger = logging.getLogger(__name__)
 
@@ -239,32 +239,6 @@ def send_trajectory_async(
 # ---------------------------------------------------------------------------
 # Segment-based execution with pre/post action hooks
 # ---------------------------------------------------------------------------
-
-
-@dataclass
-class Segment:
-    """A trajectory segment with optional pre/post actions.
-
-    Actions are callables that return True on success, False on failure.
-    Any callable works: bound methods (gripper.close), lambdas, functions.
-
-    Example:
-        Segment(0, 150)                                     # no actions
-        Segment(150, 300, pre_actions=[gripper.close])       # close gripper before
-        Segment(300, 462, post_actions=[sensor.trigger])     # trigger sensor after
-    """
-
-    start_index: int
-    """Start config index (inclusive)."""
-
-    end_index: int
-    """End config index (exclusive)."""
-
-    pre_actions: list[Callable[[], bool]] = field(default_factory=list)
-    """Actions to run before sending this segment's trajectory."""
-
-    post_actions: list[Callable[[], bool]] = field(default_factory=list)
-    """Actions to run after this segment's trajectory completes."""
 
 
 def execute_segments(

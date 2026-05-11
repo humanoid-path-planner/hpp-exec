@@ -20,7 +20,7 @@ The official tutorials for this package are in [hpp-tutorial](https://github.com
 
 ## Creating configs and times from HPP
 
-After planning and time parameterization with HPP, you have a `Path` object that maps time (seconds) to robot configurations. Sample it at regular intervals to get discrete configs:
+After planning and time parameterization with HPP, you have a `Path` object that maps time (seconds) to robot configurations. For a plain arm trajectory, sample it at regular intervals to get configs:
 
 ```python
 import numpy as np
@@ -89,12 +89,18 @@ send_trajectory(
 )
 
 # Split a manipulation path into executable pieces.
-segments = segments_from_graph(
-    configs, times, graph,
+configs, times, segments = segments_from_graph(
+    path, graph,
     on_grasp=close_gripper,
     on_release=open_gripper,
 )
-execute_segments(segments, configs, times, joint_names)
+execute_segments(
+    segments,
+    configs,
+    times,
+    joint_names,
+    time_parameterization="trapezoidal",  # use "none" for HPP-time-parameterized paths
+)
 ```
 
 See the generated Doxygen documentation for `send_trajectory_async()`,
@@ -123,6 +129,7 @@ See [examples/README.md](examples/README.md) for all examples.
 hpp-exec/
 ├── hpp_exec/           # Python package
 │   ├── __init__.py
+│   ├── segments.py        # Segment data structure
 │   ├── trajectory_utils.py # HPP config → ROS2 JointTrajectory conversion
 │   ├── ros2_sender.py     # send_trajectory() via FollowJointTrajectory action
 │   └── gripper.py         # Gripper coordination for manipulation trajectories

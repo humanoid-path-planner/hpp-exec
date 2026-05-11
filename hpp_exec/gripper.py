@@ -11,29 +11,29 @@ Example:
     # Define your own gripper (any object with open() -> bool, close() -> bool)
     gripper = MyGripperController(...)
 
-    segments = segments_from_graph(
-        configs, times, graph,
+    configs, times, segments = segments_from_graph(
+        path, graph,
         on_grasp=gripper.close,
         on_release=gripper.open,
     )
 
-    execute_segments(segments, configs, times, joint_names=[...])
+    execute_segments(
+        segments, configs, times, joint_names=[...],
+        time_parameterization="trapezoidal",
+    )
 """
 
 from __future__ import annotations
 
 import inspect
-import logging
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Callable, Dict, Iterable, List, Optional, Tuple
+from typing import TYPE_CHECKING, Callable, Iterable, List, Optional, Tuple
 
 import numpy as np
 
 if TYPE_CHECKING:
-    from hpp_exec.ros2_sender import Segment
-
-logger = logging.getLogger(__name__)
+    from hpp_exec.segments import Segment
 
 ActionSpec = (
     Callable[[], bool]
@@ -52,7 +52,7 @@ class GraspTransition:
     """A point in the trajectory where the manipulation graph transition changes."""
 
     config_index: int
-    """Index in the configs list where this transition occurs."""
+    """Index in sampled configs where this transition occurs, or -1 if unsampled."""
 
     time: float
     """Time at this config."""
@@ -118,7 +118,7 @@ def _parse_grasps_from_state_name(state_name: str) -> set[str]:
 
     # HPP uses " : " to separate multiple active grasps in state names
     parts = [p.strip() for p in state_name.split(" : ")]
-    return {p for p in parts if "grasps" in p.lower() or "grasp" in p.lower()}
+    return {p for p in parts if " grasps " in f" {p.lower()} "}
 
 
 def _grasp_label_from_transition_side(side: str) -> str:
@@ -159,48 +159,6 @@ def _parse_grasp_event_from_transition_name(
         }
 
     return set(), set()
-
-
-def _build_transition_lookup(graph) -> Dict[Tuple[str, str], List[str]]:
-    """Build a state-pair -> transition-name lookup from a pyhpp graph."""
-    lookup: Dict[Tuple[str, str], List[str]] = {}
-
-    if not hasattr(graph, "getTransitions") or not hasattr(
-        graph, "getNodesConnectedByTransition"
-    ):
-        return lookup
-
-    for transition in graph.getTransitions():
-        try:
-            state_from, state_to = graph.getNodesConnectedByTransition(transition)
-            name = transition.name()
-        except Exception as exc:
-            logger.debug("Could not inspect graph transition: %s", exc)
-            continue
-
-        lookup.setdefault((state_from, state_to), []).append(name)
-
-    return lookup
-
-
-def _transition_name_between_states(
-    lookup: Dict[Tuple[str, str], List[str]],
-    state_before: str,
-    state_after: str,
-) -> Optional[str]:
-    """Return the transition name for a state change, when it is unique."""
-    names = lookup.get((state_before, state_after), [])
-    if len(names) == 1:
-        return names[0]
-    if len(names) > 1:
-        logger.warning(
-            "Multiple graph transitions connect '%s' to '%s': %s. "
-            "Falling back to state-name grasp detection.",
-            state_before,
-            state_after,
-            names,
-        )
-    return None
 
 
 def _callable_accepts_transition(action: Callable) -> bool:
@@ -263,121 +221,6 @@ def _resolve_action(
         return lambda: action_spec(transition)
 
     return action_spec
-
-
-def extract_grasp_transitions(
-    configs: List[np.ndarray],
-    times: List[float],
-    graph,
-) -> List[GraspTransition]:
-    """Detect grasp/release events along sampled configurations.
-
-    Args:
-        configs: HPP configuration vectors along the path.
-        times: Corresponding timestamps.
-        graph: HPP manipulation graph.
-
-    Returns:
-        Ordered list of GraspTransition at each state change.
-    """
-    if len(configs) < 2:
-        return []
-
-    transitions = []
-    prev_state = graph.getStateFromConfiguration(configs[0])
-    prev_grasps = _parse_grasps_from_state_name(prev_state)
-    transition_lookup = _build_transition_lookup(graph)
-
-    for i in range(1, len(configs)):
-        state = graph.getStateFromConfiguration(configs[i])
-        grasps = _parse_grasps_from_state_name(state)
-
-        if state != prev_state or grasps != prev_grasps:
-            transition_name = _transition_name_between_states(
-                transition_lookup, prev_state, state
-            )
-            acquired, released = _parse_grasp_event_from_transition_name(
-                transition_name
-            )
-            transitions.append(
-                GraspTransition(
-                    config_index=i,
-                    time=times[i],
-                    state_before=prev_state,
-                    state_after=state,
-                    transition_name=transition_name,
-                    grasps_before=prev_grasps,
-                    grasps_after=grasps,
-                    acquired=acquired,
-                    released=released,
-                )
-            )
-            prev_state = state
-            prev_grasps = grasps
-
-    return transitions
-
-
-# ---------------------------------------------------------------------------
-# Segment builder from constraint graph
-# ---------------------------------------------------------------------------
-
-
-def segments_from_graph(
-    configs: List[np.ndarray],
-    times: List[float],
-    graph,
-    on_grasp: ActionSpec,
-    on_release: ActionSpec,
-) -> List["Segment"]:
-    """Build execution segments from HPP constraint graph transitions.
-
-    Detects graph transitions along the path and creates Segment objects with
-    on_grasp/on_release assigned as pre-actions on the appropriate segments.
-
-    Args:
-        configs: Full HPP configuration vectors along the path.
-        times: Corresponding timestamps.
-        graph: HPP manipulation constraint graph (pyhpp.manipulation.Graph).
-        on_grasp: Action to run when a grasp is acquired (e.g. gripper.close).
-            This can be a zero-arg callable, a callable accepting the
-            GraspTransition, or a dict keyed by transition name/grasp label.
-        on_release: Action to run when a grasp is released (e.g. gripper.open).
-            Supports the same forms as on_grasp.
-
-    Returns:
-        List of Segment objects ready for execute_segments().
-    """
-    from hpp_exec.ros2_sender import Segment
-
-    transitions = extract_grasp_transitions(configs, times, graph)
-
-    if not transitions:
-        return [Segment(0, len(configs))]
-
-    # Build segment boundaries: [0, t1, t2, ..., end]
-    split_indices = [0] + [t.config_index for t in transitions] + [len(configs)]
-
-    segments = []
-    for i in range(len(split_indices) - 1):
-        start = split_indices[i]
-        end = split_indices[i + 1]
-
-        pre_actions = []
-        if i > 0:
-            transition = transitions[i - 1]
-            if transition.acquired:
-                pre_actions.append(
-                    _resolve_action(on_grasp, transition, transition.acquired)
-                )
-            if transition.released:
-                pre_actions.append(
-                    _resolve_action(on_release, transition, transition.released)
-                )
-
-        segments.append(Segment(start, end, pre_actions=pre_actions))
-
-    return segments
 
 
 # ---------------------------------------------------------------------------
@@ -502,15 +345,27 @@ def _find_param_index(times: list[float], param: float) -> int:
     raise ValueError(f"parameter {param} was not sampled")
 
 
+def _looks_like_factory_transient_state(state_name: str) -> bool:
+    return " > " in state_name or " < " in state_name
+
+
 def _transition_from_interval(
     interval: _PathTransitionInterval,
     config_index: int,
 ) -> GraspTransition:
     grasps_before = _parse_grasps_from_state_name(interval.state_before)
     grasps_after = _parse_grasps_from_state_name(interval.state_after)
-    acquired, released = _parse_grasp_event_from_transition_name(
-        interval.transition_name
-    )
+    if grasps_before or grasps_after:
+        acquired = grasps_after - grasps_before
+        released = grasps_before - grasps_after
+    elif _looks_like_factory_transient_state(
+        interval.state_before
+    ) or _looks_like_factory_transient_state(interval.state_after):
+        acquired, released = set(), set()
+    else:
+        acquired, released = _parse_grasp_event_from_transition_name(
+            interval.transition_name
+        )
     transition = GraspTransition(
         config_index=config_index,
         time=interval.start_param,
@@ -522,13 +377,26 @@ def _transition_from_interval(
         acquired=acquired,
         released=released,
     )
-    if interval.transition_name and not acquired and not released:
-        transition.acquired = set()
-        transition.released = set()
     return transition
 
 
-def segments_from_path_graph(
+def extract_path_grasp_transitions(path, graph) -> List[GraspTransition]:
+    """Return grasp/release events encoded by an HPP manipulation path.
+
+    The path is inspected through its continuous HPP ``PathVector`` structure:
+    each subpath midpoint is mapped back to a constraint-graph transition with
+    ``graph.transitionAtParam``. No sampled configurations are used to detect
+    grasp boundaries.
+    """
+    transitions = []
+    for interval in _extract_path_transition_intervals(path, graph):
+        transition = _transition_from_interval(interval, config_index=-1)
+        if transition.acquired or transition.released:
+            transitions.append(transition)
+    return transitions
+
+
+def segments_from_graph(
     path,
     graph,
     on_grasp: ActionSpec,
@@ -538,7 +406,10 @@ def segments_from_path_graph(
     min_samples: int = 50,
     sample_params: Optional[Iterable[float]] = None,
 ) -> Tuple[List[np.ndarray], List[float], List["Segment"]]:
-    """Sample an HPP manipulation path and split it at graph transitions.
+    """Sample an HPP manipulation path and split it at grasp/release events.
+
+    All graph-transition boundaries are included in the sampled waypoint list,
+    but execution segments are only split where a gripper action is needed.
 
     Args:
         path: HPP manipulation path.
@@ -552,7 +423,7 @@ def segments_from_path_graph(
     Returns:
         ``(configs, times, segments)``. ``times`` are geometric path parameters.
     """
-    from hpp_exec.ros2_sender import Segment
+    from hpp_exec.segments import Segment
 
     length = _path_length(path)
     intervals = _extract_path_transition_intervals(path, graph)
@@ -572,23 +443,43 @@ def segments_from_path_graph(
     if not intervals:
         return configs, times, [Segment(0, len(configs))]
 
-    segments = []
+    event_intervals = []
     for interval in intervals:
-        start_index = _find_param_index(times, interval.start_param)
-        end_index = _find_param_index(times, interval.end_param)
+        transition = _transition_from_interval(interval, config_index=-1)
+        if transition.acquired or transition.released:
+            event_intervals.append(interval)
+
+    if not event_intervals:
+        return configs, times, [Segment(0, len(configs))]
+
+    split_params = _dedupe_params(
+        [0.0, *(interval.start_param for interval in event_intervals), length],
+        length,
+    )
+
+    segments = []
+    for i in range(len(split_params) - 1):
+        start_param = split_params[i]
+        end_param = split_params[i + 1]
+        start_index = _find_param_index(times, start_param)
+        end_index = _find_param_index(times, end_param)
         if end_index <= start_index:
             continue
 
-        transition = _transition_from_interval(interval, start_index)
         pre_actions = []
-        if transition.acquired:
-            pre_actions.append(
-                _resolve_action(on_grasp, transition, transition.acquired)
-            )
-        if transition.released:
-            pre_actions.append(
-                _resolve_action(on_release, transition, transition.released)
-            )
+        for interval in event_intervals:
+            if abs(interval.start_param - start_param) > _PARAM_EPS:
+                continue
+
+            transition = _transition_from_interval(interval, start_index)
+            if transition.acquired:
+                pre_actions.append(
+                    _resolve_action(on_grasp, transition, transition.acquired)
+                )
+            if transition.released:
+                pre_actions.append(
+                    _resolve_action(on_release, transition, transition.released)
+                )
 
         segments.append(
             Segment(start_index, end_index + 1, pre_actions=pre_actions)

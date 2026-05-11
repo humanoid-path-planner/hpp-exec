@@ -41,7 +41,7 @@ from pyhpp.manipulation import (
 from pyhpp.manipulation.constraint_graph_factory import ConstraintGraphFactory
 
 from hpp_exec import execute_segments
-from hpp_exec.gripper import extract_grasp_transitions, segments_from_path_graph
+from hpp_exec.gripper import extract_path_grasp_transitions, segments_from_graph
 
 # ---------------------------------------------------------------------------
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -250,7 +250,7 @@ def main():
     )
 
     # --- Sample path and build segments from graph transitions ---
-    full_configs, times, segments = segments_from_path_graph(
+    full_configs, times, segments = segments_from_graph(
         path,
         cg,
         on_grasp=gripper.close,
@@ -258,11 +258,11 @@ def main():
     )
 
     # --- Detect grasp transitions (for logging) ---
-    transitions = extract_grasp_transitions(full_configs, times, cg)
-    print(f"\nSampled-state grasp transitions: {len(transitions)}")
+    transitions = extract_path_grasp_transitions(path, cg)
+    print(f"\nPath grasp transitions: {len(transitions)}")
     for t in transitions:
         action = "CLOSE" if t.acquired else "OPEN"
-        print(f"  t={t.time:.2f}s (config {t.config_index}): {action}")
+        print(f"  s={t.time:.2f}: {action} ({t.transition_name})")
 
     # --- Execute ---
     print(f"\nExecuting {len(segments)} segments on Gazebo...")
