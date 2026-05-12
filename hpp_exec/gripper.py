@@ -306,7 +306,9 @@ def _extract_path_transition_intervals(path, graph) -> list[_PathTransitionInter
     return intervals
 
 
-def _uniform_sample_params(length: float, n_per_unit: int, min_samples: int) -> list[float]:
+def _uniform_sample_params(
+    length: float, n_per_unit: int, min_samples: int
+) -> list[float]:
     if length <= _PARAM_EPS:
         return [0.0]
 
@@ -481,9 +483,7 @@ def segments_from_graph(
                     _resolve_action(on_release, transition, transition.released)
                 )
 
-        segments.append(
-            Segment(start_index, end_index + 1, pre_actions=pre_actions)
-        )
+        segments.append(Segment(start_index, end_index + 1, pre_actions=pre_actions))
 
     if not segments:
         segments.append(Segment(0, len(configs)))

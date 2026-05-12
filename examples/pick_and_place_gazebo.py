@@ -79,13 +79,20 @@ def plan_pick_and_place():
     robot.setJointBounds(
         "cube/root_joint",
         [
-            -1.0, 1.0,
-            -1.0, 1.0,
-            -0.1, 1.0,
-            -1.0001, 1.0001,
-            -1.0001, 1.0001,
-            -1.0001, 1.0001,
-            -1.0001, 1.0001,
+            -1.0,
+            1.0,
+            -1.0,
+            1.0,
+            -0.1,
+            1.0,
+            -1.0001,
+            1.0001,
+            -1.0001,
+            1.0001,
+            -1.0001,
+            1.0001,
+            -1.0001,
+            1.0001,
         ],
     )
     print(f"  Config size: {robot.configSize()}")
@@ -104,7 +111,11 @@ def plan_pick_and_place():
     cube_joint = robot.model().getJointId("cube/root_joint")
 
     pc = Transformation(
-        "place_cube", robot, cube_joint, Id, cubePlacement,
+        "place_cube",
+        robot,
+        cube_joint,
+        Id,
+        cubePlacement,
         [False, False, True, True, True, False],
     )
     cts = ComparisonTypes()
@@ -116,7 +127,11 @@ def plan_pick_and_place():
     constraints["place_cube"] = Implicit(pc, cts, [True, True, True])
 
     pc = Transformation(
-        "place_cube/complement", robot, cube_joint, Id, cubePlacement,
+        "place_cube/complement",
+        robot,
+        cube_joint,
+        Id,
+        cubePlacement,
         [True, True, False, False, False, True],
     )
     cts[:] = (
@@ -135,8 +150,10 @@ def plan_pick_and_place():
         ComparisonType.Equality,
     )
     ll = LockedJoint(
-        robot, "cube/root_joint",
-        np.array([0, 0, 0.02, 0, 0, 0, 1]), cts,
+        robot,
+        "cube/root_joint",
+        np.array([0, 0, 0.02, 0, 0, 0, 1]),
+        cts,
     )
     constraints["place_cube/hold"] = ll
     cg.registerConstraints(
@@ -147,7 +164,10 @@ def plan_pick_and_place():
 
     # Pre-placement (above table at z=0.1)
     pc = Transformation(
-        "preplace_cube", robot, cube_joint, Id,
+        "preplace_cube",
+        robot,
+        cube_joint,
+        Id,
         SE3(Quaternion(1, 0, 0, 0), np.array([0, 0, 0.1])),
         [False, False, True, True, True, False],
     )
@@ -188,16 +208,46 @@ def plan_pick_and_place():
     print(f"  Transitions: {len(cg.getTransitionNames())}")
 
     # FR3 arm (7) + fingers (2) + cube freeflyer (7) = 16
-    q_init = np.array([
-        0.0, -pi / 4, 0.0, -3 * pi / 4, 0.0, pi / 2, pi / 4,
-        0.035, 0.035,
-        0.5, 0.0, 0.02, 0.0, 0.0, 0.0, 1.0,  # cube at A
-    ])
-    q_goal = np.array([
-        0.0, -pi / 4, 0.0, -3 * pi / 4, 0.0, pi / 2, pi / 4,
-        0.035, 0.035,
-        0.3, 0.3, 0.02, 0.0, 0.0, 0.0, 1.0,  # cube at B
-    ])
+    q_init = np.array(
+        [
+            0.0,
+            -pi / 4,
+            0.0,
+            -3 * pi / 4,
+            0.0,
+            pi / 2,
+            pi / 4,
+            0.035,
+            0.035,
+            0.5,
+            0.0,
+            0.02,
+            0.0,
+            0.0,
+            0.0,
+            1.0,  # cube at A
+        ]
+    )
+    q_goal = np.array(
+        [
+            0.0,
+            -pi / 4,
+            0.0,
+            -3 * pi / 4,
+            0.0,
+            pi / 2,
+            pi / 4,
+            0.035,
+            0.035,
+            0.3,
+            0.3,
+            0.02,
+            0.0,
+            0.0,
+            0.0,
+            1.0,  # cube at B
+        ]
+    )
 
     problem.initConfig(q_init)
     problem.addGoalConfig(q_goal)

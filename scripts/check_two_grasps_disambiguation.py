@@ -57,7 +57,11 @@ class MockPathVector:
 class MockConstraintGraph:
     def __init__(self):
         self._intervals = [
-            (0.0, 10.0, MockTransition("left/gripper > box1/handle | f_1", "free", "g1")),
+            (
+                0.0,
+                10.0,
+                MockTransition("left/gripper > box1/handle | f_1", "free", "g1"),
+            ),
             (
                 10.0,
                 20.0,
