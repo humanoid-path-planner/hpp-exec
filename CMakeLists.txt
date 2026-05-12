@@ -53,6 +53,7 @@ python_install_on_site("hpp_exec" "__init__.py")
 python_install_on_site("hpp_exec" "trajectory_utils.py")
 python_install_on_site("hpp_exec" "ros2_sender.py")
 python_install_on_site("hpp_exec" "gripper.py")
+python_install_on_site("hpp_exec" "segments.py")
 
 # Interface target so hpp-doc and other consumers can find_package(hpp-exec)
 # and so doc/Doxyfile.extra.in is picked up by the JRL doxygen macros.

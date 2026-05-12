@@ -66,7 +66,6 @@ def configs_to_joint_trajectory(
     return trajectory
 
 
-
 def extract_joint_config(
     hpp_config: np.ndarray,
     n_joints: int,

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-FR3 Pick-and-Place — Real Hardware with HPP Time Parameterization
+FR3 Pick-and-Place -- Real Hardware with HPP Time Parameterization
 =================================================================
 
 Self-contained script: plans a pick-and-place with HPP manipulation,
@@ -44,7 +44,7 @@ from pyhpp.manipulation import (
 from pyhpp.manipulation.constraint_graph_factory import ConstraintGraphFactory
 
 from hpp_exec import execute_segments
-from hpp_exec.gripper import extract_grasp_transitions, segments_from_graph
+from hpp_exec.gripper import extract_path_grasp_transitions, segments_from_graph
 
 # ---------------------------------------------------------------------------
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -64,33 +64,6 @@ FR3_ARM_JOINTS = [
     "fr3_joint6",
     "fr3_joint7",
 ]
-
-
-def extract_configs_timed(path, dt=0.02):
-    """Sample configs from a time-parameterized HPP path.
-
-    Since path.length() is already in seconds, we sample at a fixed
-    timestep (default 50 Hz to match typical ROS2 control rates).
-
-    Returns:
-        (full_configs, arm_configs, times) where times are real seconds.
-    """
-    duration = path.length()
-    n_samples = max(int(duration / dt), 2)
-
-    full_configs = []
-    arm_configs = []
-    times = []
-
-    for i in range(n_samples + 1):
-        t = min((i / n_samples) * duration, duration)
-        q, success = path(t)
-        if success:
-            full_configs.append(np.array(q))
-            arm_configs.append(np.array(q[:7]))
-            times.append(t)
-
-    return full_configs, arm_configs, times
 
 
 def plan_pick_and_place():
@@ -222,21 +195,18 @@ def plan_pick_and_place():
     factory.setObjects(["cube"], [["cube/handle"]], [[]])
     factory.generate()
 
-    # Complement on preplace↔grasps transitions
-    try:
-        e = cg.getTransition("fr3/gripper > cube/handle | f_23")
+    # Complement on preplace/grasp transitions
+    for transition_name in (
+        "fr3/gripper > cube/handle | f_23",
+        "fr3/gripper < cube/handle | 0-0_32",
+    ):
+        try:
+            edge = cg.getTransition(transition_name)
+        except RuntimeError:
+            continue
         cg.addNumericalConstraintsToTransition(
-            e, [constraints["place_cube/complement"]]
+            edge, [constraints["place_cube/complement"]]
         )
-    except RuntimeError:
-        pass
-    try:
-        e = cg.getTransition("fr3/gripper < cube/handle | 0-0_32")
-        cg.addNumericalConstraintsToTransition(
-            e, [constraints["place_cube/complement"]]
-        )
-    except RuntimeError:
-        pass
 
     problem.steeringMethod = Straight(problem)
     problem.pathValidation = Dichotomy(robot, 0)
@@ -322,7 +292,7 @@ def main():
 
     # --- Time parameterization via HPP ---
     # Order 2 = 5th-order polynomial: zero velocity AND acceleration
-    # at segment boundaries → smoothest motion.
+    # at segment boundaries for the smoothest motion.
     problem.setParameter("SimpleTimeParameterization/order", 2)
     problem.setParameter("SimpleTimeParameterization/maxAcceleration", 1.0)
     # safety < 1.0 scales down velocities (0.5 = use 50% of joint limits)
@@ -334,16 +304,12 @@ def main():
     duration = timed_path.length()
     print(f"Time-parameterized duration: {duration:.2f}s")
 
-    # --- Sample configs (times are now real seconds) ---
-    full_configs, arm_configs, times = extract_configs_timed(timed_path, dt=0.02)
-    print(f"Sampled {len(full_configs)} configs at 50 Hz")
-
     # --- Log transitions ---
-    transitions = extract_grasp_transitions(full_configs, times, cg)
+    transitions = extract_path_grasp_transitions(timed_path, cg)
     print(f"\nGrasp transitions: {len(transitions)}")
     for t in transitions:
         action = "GRASP" if t.acquired else "RELEASE"
-        print(f"  t={t.time:.2f}s (config {t.config_index}): {action}")
+        print(f"  t={t.time:.2f}s: {action} ({t.transition_name})")
 
     # --- Franka gripper (real hardware) ---
     gripper = FrankaGripperController(
@@ -354,14 +320,15 @@ def main():
         grasp_speed=0.05,
     )
 
-    # --- Build segments from constraint graph ---
-    segments = segments_from_graph(
-        full_configs,
-        times,
+    # --- Attach real gripper actions to the graph-derived segments ---
+    full_configs, times, segments = segments_from_graph(
+        timed_path,
         cg,
         on_grasp=gripper.close,
         on_release=gripper.open,
+        n_per_unit=50,
     )
+    print(f"Sampled {len(full_configs)} configs at about 50 Hz")
 
     # --- Execute ---
     print(f"\nExecuting {len(segments)} segments on real FR3...")

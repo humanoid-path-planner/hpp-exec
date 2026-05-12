@@ -1,7 +1,7 @@
 """
 Example gripper controller implementations.
 
-These are robot-specific — adapt or replace them for your setup.
+These are robot-specific; adapt or replace them for your setup.
 Any class with open() -> bool and close() -> bool works with
 segments_from_graph() and execute_segments().
 """

@@ -51,7 +51,7 @@ def main():
     print("FR3 Gazebo Tutorial")
     print("=" * 50)
 
-    # Build a multi-segment trajectory: home → A → B → home
+    # Build a multi-segment trajectory: home -> A -> B -> home
     segments = [
         ("Home -> Pose A", HOME, POSE_A),
         ("Pose A -> Pose B", POSE_A, POSE_B),

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-FR3 Pick-and-Place — Gazebo Execution
+FR3 Pick-and-Place -- Gazebo Execution
 ======================================
 
 Plans an HPP manipulation problem (FR3 picks a cube from A and places
@@ -41,7 +41,7 @@ from pyhpp.manipulation import (
 from pyhpp.manipulation.constraint_graph_factory import ConstraintGraphFactory
 
 from hpp_exec import execute_segments
-from hpp_exec.gripper import extract_grasp_transitions, segments_from_graph
+from hpp_exec.gripper import extract_path_grasp_transitions, segments_from_graph
 
 # ---------------------------------------------------------------------------
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -79,13 +79,20 @@ def plan_pick_and_place():
     robot.setJointBounds(
         "cube/root_joint",
         [
-            -1.0, 1.0,
-            -1.0, 1.0,
-            -0.1, 1.0,
-            -1.0001, 1.0001,
-            -1.0001, 1.0001,
-            -1.0001, 1.0001,
-            -1.0001, 1.0001,
+            -1.0,
+            1.0,
+            -1.0,
+            1.0,
+            -0.1,
+            1.0,
+            -1.0001,
+            1.0001,
+            -1.0001,
+            1.0001,
+            -1.0001,
+            1.0001,
+            -1.0001,
+            1.0001,
         ],
     )
     print(f"  Config size: {robot.configSize()}")
@@ -104,7 +111,11 @@ def plan_pick_and_place():
     cube_joint = robot.model().getJointId("cube/root_joint")
 
     pc = Transformation(
-        "place_cube", robot, cube_joint, Id, cubePlacement,
+        "place_cube",
+        robot,
+        cube_joint,
+        Id,
+        cubePlacement,
         [False, False, True, True, True, False],
     )
     cts = ComparisonTypes()
@@ -116,7 +127,11 @@ def plan_pick_and_place():
     constraints["place_cube"] = Implicit(pc, cts, [True, True, True])
 
     pc = Transformation(
-        "place_cube/complement", robot, cube_joint, Id, cubePlacement,
+        "place_cube/complement",
+        robot,
+        cube_joint,
+        Id,
+        cubePlacement,
         [True, True, False, False, False, True],
     )
     cts[:] = (
@@ -135,8 +150,10 @@ def plan_pick_and_place():
         ComparisonType.Equality,
     )
     ll = LockedJoint(
-        robot, "cube/root_joint",
-        np.array([0, 0, 0.02, 0, 0, 0, 1]), cts,
+        robot,
+        "cube/root_joint",
+        np.array([0, 0, 0.02, 0, 0, 0, 1]),
+        cts,
     )
     constraints["place_cube/hold"] = ll
     cg.registerConstraints(
@@ -147,7 +164,10 @@ def plan_pick_and_place():
 
     # Pre-placement (above table at z=0.1)
     pc = Transformation(
-        "preplace_cube", robot, cube_joint, Id,
+        "preplace_cube",
+        robot,
+        cube_joint,
+        Id,
         SE3(Quaternion(1, 0, 0, 0), np.array([0, 0, 0.1])),
         [False, False, True, True, True, False],
     )
@@ -165,16 +185,17 @@ def plan_pick_and_place():
     factory.setObjects(["cube"], [["cube/handle"]], [[]])
     factory.generate()
 
-    try:
-        e = cg.getTransition("fr3/gripper > cube/handle | f_23")
-        cg.addNumericalConstraintsToTransition(e, [constraints["place_cube/complement"]])
-    except RuntimeError:
-        pass
-    try:
-        e = cg.getTransition("fr3/gripper < cube/handle | 0-0_32")
-        cg.addNumericalConstraintsToTransition(e, [constraints["place_cube/complement"]])
-    except RuntimeError:
-        pass
+    for transition_name in (
+        "fr3/gripper > cube/handle | f_23",
+        "fr3/gripper < cube/handle | 0-0_32",
+    ):
+        try:
+            edge = cg.getTransition(transition_name)
+        except RuntimeError:
+            continue
+        cg.addNumericalConstraintsToTransition(
+            edge, [constraints["place_cube/complement"]]
+        )
 
     problem.steeringMethod = Straight(problem)
     problem.pathValidation = Dichotomy(robot, 0)
@@ -187,16 +208,46 @@ def plan_pick_and_place():
     print(f"  Transitions: {len(cg.getTransitionNames())}")
 
     # FR3 arm (7) + fingers (2) + cube freeflyer (7) = 16
-    q_init = np.array([
-        0.0, -pi / 4, 0.0, -3 * pi / 4, 0.0, pi / 2, pi / 4,
-        0.035, 0.035,
-        0.5, 0.0, 0.02, 0.0, 0.0, 0.0, 1.0,  # cube at A
-    ])
-    q_goal = np.array([
-        0.0, -pi / 4, 0.0, -3 * pi / 4, 0.0, pi / 2, pi / 4,
-        0.035, 0.035,
-        0.3, 0.3, 0.02, 0.0, 0.0, 0.0, 1.0,  # cube at B
-    ])
+    q_init = np.array(
+        [
+            0.0,
+            -pi / 4,
+            0.0,
+            -3 * pi / 4,
+            0.0,
+            pi / 2,
+            pi / 4,
+            0.035,
+            0.035,
+            0.5,
+            0.0,
+            0.02,
+            0.0,
+            0.0,
+            0.0,
+            1.0,  # cube at A
+        ]
+    )
+    q_goal = np.array(
+        [
+            0.0,
+            -pi / 4,
+            0.0,
+            -3 * pi / 4,
+            0.0,
+            pi / 2,
+            pi / 4,
+            0.035,
+            0.035,
+            0.3,
+            0.3,
+            0.02,
+            0.0,
+            0.0,
+            0.0,
+            1.0,  # cube at B
+        ]
+    )
 
     problem.initConfig(q_init)
     problem.addGoalConfig(q_goal)
@@ -218,36 +269,11 @@ def plan_pick_and_place():
     return robot, problem, cg, path
 
 
-def extract_configs(path, n_per_unit=50):
-    """Sample full and arm-only configs from an HPP path."""
-    n_samples = max(int(path.length() * n_per_unit), 50)
-    full_configs = []
-    arm_configs = []
-    times = []
-    for i in range(n_samples + 1):
-        t = (i / n_samples) * path.length()
-        q, success = path(t)
-        if success:
-            full_configs.append(np.array(q))
-            arm_configs.append(np.array(q[:7]))
-            times.append(t)
-    return full_configs, arm_configs, times
-
-
 def main():
     # --- Plan ---
     robot, problem, cg, path = plan_pick_and_place()
     if path is None:
         return 1
-
-    full_configs, arm_configs, times = extract_configs(path)
-
-    # --- Detect grasp transitions (for logging) ---
-    transitions = extract_grasp_transitions(full_configs, times, cg)
-    print(f"\nGrasp transitions: {len(transitions)}")
-    for t in transitions:
-        action = "CLOSE" if t.acquired else "OPEN"
-        print(f"  t={t.time:.2f}s (config {t.config_index}): {action}")
 
     # --- Gripper controller (FR3-specific) ---
     gripper = JointTrajectoryGripperController(
@@ -258,14 +284,20 @@ def main():
         duration=1.0,
     )
 
-    # --- Build segments from constraint graph ---
-    segments = segments_from_graph(
-        full_configs,
-        times,
+    # --- Sample path and build segments from graph transitions ---
+    full_configs, times, segments = segments_from_graph(
+        path,
         cg,
         on_grasp=gripper.close,
         on_release=gripper.open,
     )
+
+    # --- Detect grasp transitions (for logging) ---
+    transitions = extract_path_grasp_transitions(path, cg)
+    print(f"\nPath grasp transitions: {len(transitions)}")
+    for t in transitions:
+        action = "CLOSE" if t.acquired else "OPEN"
+        print(f"  s={t.time:.2f}: {action} ({t.transition_name})")
 
     # --- Execute ---
     print(f"\nExecuting {len(segments)} segments on Gazebo...")

@@ -11,17 +11,16 @@ license = {text = "BSD-2-Clause"}
 authors = [
   {name = "LAAS-CNRS", email = "hpp@laas.fr"}
 ]
-requires-python = ">=3.8"
+requires-python = ">=3.10"
 classifiers = [
   "Development Status :: 3 - Alpha",
   "Intended Audience :: Science/Research",
   "License :: OSI Approved :: BSD License",
   "Operating System :: POSIX :: Linux",
   "Programming Language :: Python :: 3",
-  "Programming Language :: Python :: 3.8",
-  "Programming Language :: Python :: 3.9",
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
   "Topic :: Scientific/Engineering :: Robotics"
 ]
 keywords = ["robotics", "motion-planning", "hpp", "manipulation"]
