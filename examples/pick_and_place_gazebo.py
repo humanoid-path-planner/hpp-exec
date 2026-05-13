@@ -29,7 +29,7 @@ from pyhpp.constraints import (
     LockedJoint,
     Transformation,
 )
-from pyhpp.core import Dichotomy, Straight
+from pyhpp.core import Dichotomy, Straight, TrapezoidalTimeParameterization
 from pyhpp.manipulation import (
     Device,
     Graph,
@@ -275,6 +275,13 @@ def main():
     if path is None:
         return 1
 
+    # --- Time parameterization via HPP ---
+    optimizer = TrapezoidalTimeParameterization(problem)
+    optimizer.maxVelocity = 0.3
+    optimizer.maxAcceleration = 0.5
+    timed_path = optimizer.optimize(path)
+    print(f"\nTime-parameterized duration: {timed_path.length():.2f}s")
+
     # --- Gripper controller (FR3-specific) ---
     gripper = JointTrajectoryGripperController(
         topic="/gripper_controller/follow_joint_trajectory",
@@ -286,18 +293,18 @@ def main():
 
     # --- Sample path and build segments from graph transitions ---
     full_configs, times, segments = segments_from_graph(
-        path,
+        timed_path,
         cg,
         on_grasp=gripper.close,
         on_release=gripper.open,
     )
 
     # --- Detect grasp transitions (for logging) ---
-    transitions = extract_path_grasp_transitions(path, cg)
+    transitions = extract_path_grasp_transitions(timed_path, cg)
     print(f"\nPath grasp transitions: {len(transitions)}")
     for t in transitions:
         action = "CLOSE" if t.acquired else "OPEN"
-        print(f"  s={t.time:.2f}: {action} ({t.transition_name})")
+        print(f"  t={t.time:.2f}s: {action} ({t.transition_name})")
 
     # --- Execute ---
     print(f"\nExecuting {len(segments)} segments on Gazebo...")
@@ -307,8 +314,6 @@ def main():
         times,
         joint_names=FR3_ARM_JOINTS,
         joint_indices=list(range(7)),
-        time_parameterization="trapezoidal",
-        max_velocity=0.3,
     )
 
     gripper.destroy()

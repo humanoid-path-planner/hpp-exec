@@ -79,7 +79,7 @@ class MockConstraintGraph:
         for start, end, transition in self._intervals:
             if start <= param <= end:
                 return transition
-        raise ValueError(f"No transition at path parameter {param}")
+        raise ValueError(f"No transition at time {param}")
 
     def getNodesConnectedByTransition(self, transition):
         return transition.state_from, transition.state_to

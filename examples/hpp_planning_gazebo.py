@@ -24,7 +24,7 @@ import time
 
 import numpy as np
 from pinocchio import SE3
-from pyhpp.core import BiRRTPlanner, Problem
+from pyhpp.core import BiRRTPlanner, Problem, TrapezoidalTimeParameterization
 from pyhpp.pinocchio import Device, urdf
 
 from hpp_exec import send_trajectory
@@ -114,13 +114,20 @@ def main():
     elapsed = time.time() - start
     print(f"  Solved in {elapsed:.1f}s, path length: {path.length():.3f}")
 
+    # --- Time parameterization ---
+    optimizer = TrapezoidalTimeParameterization(problem)
+    optimizer.maxVelocity = 0.5
+    optimizer.maxAcceleration = 0.5
+    timed_path = optimizer.optimize(path)
+    print(f"  Timed duration: {timed_path.length():.2f}s")
+
     # --- Extract configs ---
-    n_samples = max(int(path.length() / 0.02), 50)
+    n_samples = max(int(timed_path.length() / 0.02), 50)
     configs = []
     times = []
     for i in range(n_samples + 1):
-        t = (i / n_samples) * path.length()
-        q, success = path(t)
+        t = (i / n_samples) * timed_path.length()
+        q, success = timed_path(t)
         if success:
             # Extract arm joints only (indices 0-6), skip fingers
             configs.append(np.array(q[:7]))
@@ -140,8 +147,6 @@ def main():
         configs,
         times,
         joint_names=FR3_ARM_JOINTS,
-        time_parameterization="trapezoidal",
-        max_velocity=0.5,
     )
 
     if not success:

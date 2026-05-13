@@ -24,9 +24,14 @@ After planning and time parameterization with HPP, you have a `Path` object that
 
 ```python
 import numpy as np
+from pyhpp.core import TrapezoidalTimeParameterization
 
-# After solving and time parameterization:
-# p_timed = ps.getPath(pathId)  # or via path optimizer
+# After solving:
+# path = planner.solve()
+optimizer = TrapezoidalTimeParameterization(problem)
+optimizer.maxVelocity = 0.5
+optimizer.maxAcceleration = 0.5
+p_timed = optimizer.optimize(path)
 
 n_samples = 50
 configs = []
@@ -82,9 +87,8 @@ from hpp_exec import (
 # Main function - send trajectory to ros2_control
 send_trajectory(
     configs,              # List[np.ndarray] from HPP
-    times,                # List[float] timestamps or path parameter values
+    times,                # List[float] timestamps in seconds
     joint_names,            # List[str] ROS2 joint names
-    time_parameterization="none",  # "none" for seconds, "trapezoidal" to rescale
     controller_topic="...", # FollowJointTrajectory action topic
 )
 
@@ -99,13 +103,11 @@ execute_segments(
     configs,
     times,
     joint_names,
-    time_parameterization="trapezoidal",  # use "none" for HPP-time-parameterized paths
 )
 ```
 
 See the generated Doxygen documentation for `send_trajectory_async()`,
-`configs_to_joint_trajectory()`, `add_time_parameterization()`, and other
-lower-level helpers.
+`configs_to_joint_trajectory()`, and other lower-level helpers.
 
 ## Examples
 

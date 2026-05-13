@@ -7,8 +7,8 @@ Self-contained script: plans a pick-and-place with HPP manipulation,
 applies SimpleTimeParameterization for dynamically-feasible timing,
 then executes on a real FR3 with Franka gripper actions.
 
-This means the path parameter IS real time (seconds), so we bypass
-hpp-exec's simple time scaling entirely.
+This means the path has already been time-parameterized before it reaches
+hpp-exec.
 
 Prerequisites:
     # Launch franka_ros2 with real robot
@@ -293,12 +293,11 @@ def main():
     # --- Time parameterization via HPP ---
     # Order 2 = 5th-order polynomial: zero velocity AND acceleration
     # at segment boundaries for the smoothest motion.
-    problem.setParameter("SimpleTimeParameterization/order", 2)
-    problem.setParameter("SimpleTimeParameterization/maxAcceleration", 1.0)
-    # safety < 1.0 scales down velocities (0.5 = use 50% of joint limits)
-    problem.setParameter("SimpleTimeParameterization/safety", 0.5)
-
     optimizer = SimpleTimeParameterization(problem)
+    optimizer.order = 2
+    optimizer.maxAcceleration = 1.0
+    # safety < 1.0 scales down velocities (0.5 = use 50% of joint limits)
+    optimizer.safety = 0.5
     timed_path = optimizer.optimize(path)
 
     duration = timed_path.length()
@@ -338,7 +337,6 @@ def main():
         times,
         joint_names=FR3_ARM_JOINTS,
         joint_indices=list(range(7)),
-        time_parameterization="none",  # times already in seconds from HPP
     )
 
     gripper.destroy()

@@ -17,9 +17,9 @@ cd ~/devel/src && make all
 | File | Description | Target |
 |------|-------------|--------|
 | `simple_trajectory.py` | Send hardcoded poses, no HPP planning | Gazebo |
-| `hpp_planning_gazebo.py` | HPP BiRRT planning + execution | Gazebo |
-| `pick_and_place_gazebo.py` | Pick-and-place with gripper on Gazebo | Gazebo |
-| `pick_and_place_franka.py` | Pick-and-place with Franka gripper | Real hardware |
+| `hpp_planning_gazebo.py` | HPP BiRRT planning + timed execution | Gazebo |
+| `pick_and_place_gazebo.py` | Pick-and-place with HPP timing and gripper on Gazebo | Gazebo |
+| `pick_and_place_franka.py` | Pick-and-place with HPP timing and Franka gripper | Real hardware |
 | `pick_and_place_franka_timed.py` | Same + HPP `SimpleTimeParameterization` | Real hardware |
 | `mock_controller.py` | Mock ROS2 controller for testing | Local |
 

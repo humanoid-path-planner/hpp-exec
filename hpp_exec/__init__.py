@@ -10,12 +10,10 @@ Example:
     configs = [...]
     times = [...]
 
-    # Execute on robot (times are path parameters, need rescaling)
+    # Execute on robot (times are already seconds)
     send_trajectory(
         configs, times,
         joint_names=["joint1", "joint2", ...],
-        time_parameterization="trapezoidal",
-        max_velocity=1.0,
     )
 """
 
@@ -38,7 +36,6 @@ try:
         send_trajectory_async,
     )
     from hpp_exec.trajectory_utils import (
-        add_time_parameterization,
         configs_to_joint_trajectory,
         extract_joint_config,
     )
@@ -56,7 +53,6 @@ except ModuleNotFoundError as exc:
     send_trajectory_async = _missing_ros2
     execute_segments = _missing_ros2
     configs_to_joint_trajectory = _missing_ros2
-    add_time_parameterization = _missing_ros2
     extract_joint_config = _missing_ros2
 
 __all__ = [
@@ -65,7 +61,6 @@ __all__ = [
     "execute_segments",
     "Segment",
     "configs_to_joint_trajectory",
-    "add_time_parameterization",
     "extract_joint_config",
     "segments_from_graph",
     "extract_path_grasp_transitions",
