@@ -27,22 +27,29 @@
 ///
 /// \code{.py}
 /// import numpy as np
+/// from pyhpp.core import TrapezoidalTimeParameterization
 /// from hpp_exec import send_trajectory
 ///
 /// # 1. Plan with HPP (using pyhpp directly).
-/// path = problem.solve()
+/// path = planner.solve()
 ///
-/// # 2. Sample the path into waypoints.
+/// # 2. Add timing in HPP, then sample the timed path into waypoints.
+/// optimizer = TrapezoidalTimeParameterization(problem)
+/// optimizer.maxVelocity = 0.5
+/// optimizer.maxAcceleration = 0.5
+/// timed_path = optimizer.optimize(path)
+///
 /// n = 100
-/// configs = [np.array(path(t * path.length() / n)[0]) for t in range(n + 1)]
-/// times   = [t * path.length() / n for t in range(n + 1)]
+/// configs = [
+///     np.array(timed_path(t * timed_path.length() / n)[0])
+///     for t in range(n + 1)
+/// ]
+/// times = [t * timed_path.length() / n for t in range(n + 1)]
 ///
 /// # 3. Send to ros2_control.
 /// send_trajectory(
 ///     configs, times,
 ///     joint_names=["joint1", "joint2", "joint3", "joint4", "joint5", "joint6"],
-///     time_parameterization="trapezoidal",
-///     max_velocity=1.0,
 /// )
 /// \endcode
 ///
@@ -50,8 +57,7 @@
 /// between HPP and \c hpp-exec. \c configs holds full HPP configuration
 /// vectors (which may include object DOFs, gripper fingers, etc.); the
 /// \c joint_indices argument selects which entries belong to the arm. The
-/// \c times list is the timestamp of each config, and may be either real
-/// seconds or path parameter values --- see the next section.
+/// \c times list is the timestamp of each config in seconds.
 ///
 /// \section hpp_exec_api Quick API reference
 ///
@@ -67,7 +73,6 @@
 ///     segments_from_graph,
 ///     extract_path_grasp_transitions,
 ///     configs_to_joint_trajectory,
-///     add_time_parameterization,
 ///     extract_joint_config,
 /// )
 /// \endcode
@@ -80,9 +85,6 @@
 ///     times: list[float],
 ///     joint_names: list[str],
 ///     controller_topic: str = "/joint_trajectory_controller/follow_joint_trajectory",
-///     time_parameterization: str = "none",
-///     max_velocity: float = 1.0,
-///     max_acceleration: float = 0.5,
 ///     joint_indices: list[int] | None = None,
 /// ) -> bool
 ///
@@ -91,9 +93,6 @@
 ///     times: list[float],
 ///     joint_names: list[str],
 ///     controller_topic: str = "/joint_trajectory_controller/follow_joint_trajectory",
-///     time_parameterization: str = "none",
-///     max_velocity: float = 1.0,
-///     max_acceleration: float = 0.5,
 ///     joint_indices: list[int] | None = None,
 /// )
 ///
@@ -103,9 +102,6 @@
 ///     times: list[float],
 ///     joint_names: list[str],
 ///     joint_indices: list[int] | None = None,
-///     time_parameterization: str = "none",
-///     max_velocity: float = 1.0,
-///     max_acceleration: float = 0.5,
 ///     controller_topic: str = "/joint_trajectory_controller/follow_joint_trajectory",
 /// ) -> bool
 /// \endcode
@@ -160,13 +156,6 @@
 ///     accelerations: list[np.ndarray] | None = None,
 /// ) -> trajectory_msgs.msg.JointTrajectory
 ///
-/// add_time_parameterization(
-///     configs: list[np.ndarray],
-///     times: list[float],
-///     max_velocity: float = 1.0,
-///     max_acceleration: float = 0.5,
-/// ) -> list[float]
-///
 /// extract_joint_config(
 ///     hpp_config: np.ndarray,
 ///     n_joints: int,
@@ -177,28 +166,16 @@
 /// \section hpp_exec_time Time parameterization
 ///
 /// HPP paths are parameterized by a path parameter \f$s\f$, not by time.
-/// Before sending a trajectory to \c ros2_control, the parameter values
-/// have to be turned into seconds. \c hpp-exec offers two strategies,
-/// selected by the \c time_parameterization argument of \c send_trajectory:
+/// Before sending a trajectory to \c ros2_control, the parameter values have
+/// to be turned into seconds by HPP. \c hpp-exec always assumes that the
+/// \c times list already contains timestamps in seconds. Use an HPP path
+/// optimizer such as \c SimpleTimeParameterization or
+/// \c TrapezoidalTimeParameterization, then sample the optimized path and pass
+/// those sample times unchanged to \c send_trajectory.
 ///
-/// \li \c "none" (default): \c times is assumed to already contain real
-///     seconds. Use this when HPP itself has time-parameterized the path
-///     (e.g.\ via the \c SimpleTimeParameterization path optimizer): the
-///     parameter values returned by the optimized path are then proper
-///     timestamps and no further rescaling is needed.
-///
-/// \li \c "trapezoidal": \c times is treated as path parameter values and
-///     rescaled by \c add_time_parameterization. For each consecutive
-///     pair of configurations, the time step is set to the largest joint
-///     displacement divided by \c max_velocity, with a 10 ms floor.
-///     This is a deliberately simple heuristic --- it does not actually
-///     enforce \c max_acceleration, only avoids exceeding the joint
-///     velocity bound. For high-quality time parameterization, prefer
-///     letting HPP do the work and pass the result with \c "none".
-///
-/// In both cases the per-point velocity is set to zero only at the first
-/// and last waypoint; intermediate velocities are left empty so that the
-/// joint trajectory controller smooths between configurations.
+/// The per-point velocity is set to zero only at the first and last waypoint;
+/// intermediate velocities are left empty so that the joint trajectory
+/// controller smooths between configurations.
 ///
 /// \c send_trajectory returns \c True only when the action goal is accepted
 /// and the controller reports a successful \c FollowJointTrajectory result.
@@ -260,12 +237,10 @@
 /// A segment containing fewer than two configurations is treated as a
 /// pure action point: the trajectory is skipped and only the actions run.
 ///
-/// \c execute_segments accepts the same \c time_parameterization,
-/// \c max_velocity and \c max_acceleration arguments as \c send_trajectory
-/// and forwards them to every sub-trajectory it sends. Use \c "trapezoidal"
-/// here if your \c times list holds path parameter values for the whole
-/// path; \c hpp-exec will rescale each segment independently against the
-/// joint velocity bound.
+/// \c execute_segments assumes that the \c times list already contains
+/// seconds for the whole path. Apply time parameterization in HPP before
+/// calling \c segments_from_graph; each segment will then inherit the sampled
+/// timing and be normalized to start at <tt>t = 0</tt> before it is sent.
 ///
 /// \section hpp_exec_grasps Grasp segments from a constraint graph
 ///
@@ -296,7 +271,6 @@
 ///     configs,
 ///     times,
 ///     joint_names=[...],
-///     time_parameterization="trapezoidal",
 /// )
 /// \endcode
 ///
@@ -318,8 +292,8 @@
 /// useful for diagnostics or for plugging in custom action logic. Each
 /// transition carries:
 ///
-/// \li \c config_index, \c time: the sampled index and path parameter where
-///     the transition occurs. \c extract_path_grasp_transitions does not
+/// \li \c config_index, \c time: the sampled index and timestamp where the
+///     transition occurs. \c extract_path_grasp_transitions does not
 ///     sample configs, so its \c config_index is \c -1.
 /// \li \c state_before, \c state_after: graph state names returned by
 ///     \c graph.getNodesConnectedByTransition(edge).
@@ -379,7 +353,7 @@
 /// \code{.py}
 /// gripper = FrankaGripperController("fr3")
 /// configs, times, segments = segments_from_graph(
-///     path, graph,
+///     timed_path, graph,
 ///     on_grasp=gripper.close,
 ///     on_release=gripper.open,
 /// )
@@ -389,7 +363,6 @@
 ///     configs,
 ///     times,
 ///     joint_names=[...],
-///     time_parameterization="trapezoidal",
 /// )
 /// \endcode
 ///
@@ -430,11 +403,6 @@
 /// waypoints are left empty so the controller smooths between them), and
 /// passes \c times through unchanged - the caller is responsible for
 /// providing real seconds.
-///
-/// \c add_time_parameterization is the trapezoidal heuristic invoked by
-/// \c time_parameterization="trapezoidal". Call it directly if you want to
-/// rescale a list of path-parameter values against a velocity bound without
-/// going through \c send_trajectory.
 ///
 /// \c extract_joint_config is a one-line slicing helper that returns
 /// <tt>[hpp_config[offset + i] for i in range(n_joints)]</tt> as a list of

@@ -119,7 +119,7 @@ class MockConstraintGraph:
         for start, end, transition in self._intervals:
             if start <= param <= end:
                 return transition
-        raise ValueError(f"No transition at path parameter {param}")
+        raise ValueError(f"No transition at time {param}")
 
     def getNodesConnectedByTransition(self, transition):
         return transition.state_from, transition.state_to
@@ -203,8 +203,6 @@ def main():
         times,
         joint_names=FR3_ARM_JOINTS,
         joint_indices=list(range(7)),
-        time_parameterization="trapezoidal",
-        max_velocity=0.3,
     )
 
     print(f"\nResult: {'SUCCESS' if success else 'FAILED'}")

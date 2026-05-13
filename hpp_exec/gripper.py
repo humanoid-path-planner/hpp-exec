@@ -12,14 +12,13 @@ Example:
     gripper = MyGripperController(...)
 
     configs, times, segments = segments_from_graph(
-        path, graph,
+        timed_path, graph,
         on_grasp=gripper.close,
         on_release=gripper.open,
     )
 
     execute_segments(
         segments, configs, times, joint_names=[...],
-        time_parameterization="trapezoidal",
     )
 """
 
@@ -334,7 +333,7 @@ def _sample_path_at(path, param: float) -> np.ndarray:
     if isinstance(result, tuple):
         config, success = result
         if not success:
-            raise RuntimeError(f"path evaluation failed at parameter {param}")
+            raise RuntimeError(f"path evaluation failed at time {param}")
     else:
         config = result
     return np.array(config)
@@ -344,7 +343,7 @@ def _find_param_index(times: list[float], param: float) -> int:
     for index, time in enumerate(times):
         if abs(time - param) <= _PARAM_EPS:
             return index
-    raise ValueError(f"parameter {param} was not sampled")
+    raise ValueError(f"time {param} was not sampled")
 
 
 def _looks_like_factory_transient_state(state_name: str) -> bool:
@@ -418,12 +417,12 @@ def segments_from_graph(
         graph: HPP manipulation graph.
         on_grasp: Action to run before intervals that acquire a grasp.
         on_release: Action to run before intervals that release a grasp.
-        n_per_unit: Number of regular samples per path-parameter unit.
+        n_per_unit: Number of regular samples per second.
         min_samples: Minimum number of regular samples.
-        sample_params: Optional path parameters to use instead of regular sampling.
+        sample_params: Optional time values to use instead of regular sampling.
 
     Returns:
-        ``(configs, times, segments)``. ``times`` are geometric path parameters.
+        ``(configs, times, segments)``. ``times`` are timestamps in seconds.
     """
     from hpp_exec.segments import Segment
 

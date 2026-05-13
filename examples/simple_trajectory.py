@@ -4,7 +4,7 @@ FR3 Simple Trajectory
 =====================
 
 Send a simple trajectory to the FR3 robot in Gazebo simulation.
-Demonstrates send_trajectory() with time parameterization.
+Demonstrates send_trajectory() with already-timed waypoints.
 
 Prerequisites:
     # Terminal 1: Launch Gazebo with FR3
@@ -35,14 +35,14 @@ POSE_A = np.array([0.5, -0.3, 0.3, -1.5, 0.2, 1.2, 0.5])
 POSE_B = np.array([-0.5, -0.3, -0.3, -1.5, -0.2, 1.2, -0.5])
 
 
-def interpolate(start, end, n_points=30):
+def interpolate(start, end, n_points=30, duration=3.0):
     """Linear interpolation between two configurations."""
     configs = []
     times = []
     for i in range(n_points):
-        t = i / (n_points - 1)
-        configs.append(start + t * (end - start))
-        times.append(t)  # path parameter, not real time
+        ratio = i / (n_points - 1)
+        configs.append(start + ratio * (end - start))
+        times.append(ratio * duration)
     return configs, times
 
 
@@ -59,18 +59,14 @@ def main():
     ]
 
     for name, start, end in segments:
-        configs, times = interpolate(start, end, n_points=30)
+        configs, times = interpolate(start, end, n_points=30, duration=3.0)
 
         print(f"\n  {name} ({len(configs)} configs)...")
 
-        # times are path parameters (0 to 1), NOT real seconds.
-        # "trapezoidal" rescales them to respect joint velocity limits.
         success = send_trajectory(
             configs,
             times,
             joint_names=FR3_JOINTS,
-            time_parameterization="trapezoidal",
-            max_velocity=0.5,
         )
 
         if not success:

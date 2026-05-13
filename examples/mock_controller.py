@@ -22,9 +22,7 @@ Usage:
 
     send_trajectory(configs, times,
         joint_names=['shoulder_pan_joint','shoulder_lift_joint','elbow_joint',
-                     'wrist_1_joint','wrist_2_joint','wrist_3_joint'],
-        time_parameterization='trapezoidal',
-        max_velocity=0.5)
+                     'wrist_1_joint','wrist_2_joint','wrist_3_joint'])
     "
 
 RViz2 setup:

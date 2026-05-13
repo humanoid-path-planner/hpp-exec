@@ -22,7 +22,7 @@ def configs_to_joint_trajectory(
 
     Args:
         configs: List of configuration vectors from HPP
-        times: List of timestamps (path parameter values)
+        times: List of timestamps in seconds
         joint_names: ROS2 joint names in desired order
         joint_indices: Indices to extract from HPP config (default: 0 to len(joint_names))
         velocities: Optional velocity vectors (same length as configs)
@@ -86,45 +86,3 @@ def extract_joint_config(
         List of joint values
     """
     return [float(hpp_config[offset + i]) for i in range(n_joints)]
-
-
-def add_time_parameterization(
-    configs: List[np.ndarray],
-    times: List[float],
-    max_velocity: float = 1.0,
-    max_acceleration: float = 0.5,
-) -> List[float]:
-    """
-    Simple trapezoidal time parameterization.
-
-    Scales times to respect velocity/acceleration limits.
-    For proper time parameterization, use HPP's SimpleTimeParameterization.
-
-    Args:
-        configs: Configuration vectors
-        times: Original path parameter values
-        max_velocity: Maximum joint velocity (rad/s)
-        max_acceleration: Maximum joint acceleration (rad/s^2)
-
-    Returns:
-        Rescaled times
-    """
-    if len(configs) < 2:
-        return times
-
-    # Compute max displacement per segment
-    scaled_times = [0.0]
-    total_time = 0.0
-
-    for i in range(1, len(configs)):
-        dq = np.abs(configs[i] - configs[i - 1])
-        max_dq = np.max(dq)
-
-        # Time needed at max velocity
-        dt = max_dq / max_velocity if max_velocity > 0 else 0.0
-        dt = max(dt, 0.01)  # Minimum 10ms between points
-
-        total_time += dt
-        scaled_times.append(total_time)
-
-    return scaled_times
