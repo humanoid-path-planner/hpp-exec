@@ -122,12 +122,12 @@ execute_segments(
 
 # Dictionary API: instead of the manual appends above, leave segments
 # unchanged and attach actions by graph transition name when starting execution.
-# This applies the action to every segment with that transition name.
+# This applies each action to every segment with that transition name.
 pre_actions = {
-    "fr3/gripper > box/handle | f_23": grasp_box,
+    "fr3/gripper > box/handle | f_23": [grasp_box],
 }
 post_actions = {
-    "fr3/gripper < box/handle | 0-0_21": release_box,
+    "fr3/gripper < box/handle | 0-0_21": [release_box],
 }
 
 execute_segments(
