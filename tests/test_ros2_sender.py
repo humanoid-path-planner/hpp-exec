@@ -54,7 +54,7 @@ def test_trajectory_type_support_import_is_serialized(monkeypatch):
     assert max_active_calls == 1
 
 
-def test_execute_segments_runs_single_transition_actions(monkeypatch):
+def test_execute_segments_runs_transition_action_lists(monkeypatch):
     ros2_sender = _ros2_sender()
 
     calls = []
@@ -78,8 +78,8 @@ def test_execute_segments_runs_single_transition_actions(monkeypatch):
         configs,
         times,
         joint_names=["joint"],
-        pre_actions_by_transition={"grasp": _action(calls, "pre-grasp")},
-        post_actions_by_transition={"grasp": _action(calls, "post-grasp")},
+        pre_actions_by_transition={"grasp": [_action(calls, "pre-grasp")]},
+        post_actions_by_transition={"grasp": [_action(calls, "post-grasp")]},
     )
 
     assert calls == ["trajectory", "pre-grasp", "trajectory", "post-grasp"]
@@ -115,10 +115,10 @@ def test_execute_segments_runs_transition_action_lists_in_order(monkeypatch):
             ]
         },
         post_actions_by_transition={
-            "handoff": (
+            "handoff": [
                 _action(calls, "map-post-1"),
                 _action(calls, "map-post-2"),
-            )
+            ]
         },
     )
 
@@ -135,7 +135,7 @@ def test_execute_segments_runs_transition_action_lists_in_order(monkeypatch):
     assert segment.post_actions and len(segment.post_actions) == 1
 
 
-def test_execute_segments_rejects_unknown_transition_before_running(monkeypatch):
+def test_execute_segments_ignores_unknown_transition_actions(monkeypatch):
     ros2_sender = _ros2_sender()
 
     calls = []
@@ -152,14 +152,14 @@ def test_execute_segments_rejects_unknown_transition_before_running(monkeypatch)
         transition_name="known",
     )
 
-    assert not ros2_sender.execute_segments(
+    assert ros2_sender.execute_segments(
         [segment],
         [np.array([0.0]), np.array([1.0])],
         [0.0, 1.0],
         joint_names=["joint"],
-        pre_actions_by_transition={"missing": _action(calls, "map-pre")},
+        pre_actions_by_transition={"missing": [_action(calls, "map-pre")]},
     )
-    assert calls == []
+    assert calls == ["segment-pre", "trajectory"]
 
 
 def test_execute_segments_without_action_maps_keeps_segment_api(monkeypatch):

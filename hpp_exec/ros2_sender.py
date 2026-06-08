@@ -30,15 +30,15 @@ Example:
         configs,
         times,
         joint_names=[...],
-        pre_actions_by_transition={"grasp transition": gripper.close},
-        post_actions_by_transition={"release transition": gripper.open},
+        pre_actions_by_transition={"grasp transition": [gripper.close]},
+        post_actions_by_transition={"release transition": [gripper.open]},
     )
 """
 
 import logging
 import threading
 from itertools import count
-from typing import Callable, List, Mapping, Optional, Sequence
+from typing import Callable, List, Optional
 
 import numpy as np
 import rclpy
@@ -57,7 +57,6 @@ _NODE_IDS = count()
 _RCLPY_INIT_LOCK = threading.Lock()
 _TYPE_SUPPORT_LOCK = threading.Lock()
 Action = Callable[[], bool]
-TransitionActionMap = Mapping[str, Action | Sequence[Action]]
 
 
 def _ensure_rclpy_initialized() -> None:
@@ -85,35 +84,6 @@ def _action_name(action) -> str:
         or getattr(action, "__name__", None)
         or repr(action)
     )
-
-
-def _actions_for_transition(
-    actions_by_transition: TransitionActionMap | None,
-    transition_name: str,
-) -> list[Action]:
-    if not actions_by_transition:
-        return []
-
-    actions = actions_by_transition.get(transition_name)
-    if actions is None:
-        return []
-    if callable(actions):
-        return [actions]
-    return list(actions)
-
-
-def _unmatched_transition_names(
-    segments: Sequence[Segment],
-    *action_maps: TransitionActionMap | None,
-) -> set[str]:
-    transition_names = {segment.transition_name for segment in segments}
-    action_transition_names = {
-        transition_name
-        for action_map in action_maps
-        if action_map
-        for transition_name in action_map
-    }
-    return action_transition_names - transition_names
 
 
 class _TrajectorySenderNode(Node):
@@ -289,8 +259,8 @@ def execute_segments(
     joint_indices: Optional[List[int]] = None,
     controller_topic: str = "/joint_trajectory_controller/follow_joint_trajectory",
     *,
-    pre_actions_by_transition: TransitionActionMap | None = None,
-    post_actions_by_transition: TransitionActionMap | None = None,
+    pre_actions_by_transition: dict[str, list[Action]] | None = None,
+    post_actions_by_transition: dict[str, list[Action]] | None = None,
 ) -> bool:
     """Execute trajectory segments with pre/post action hooks.
 
@@ -309,36 +279,23 @@ def execute_segments(
             Default: 0..len(joint_names).
         controller_topic: FollowJointTrajectory action topic.
         pre_actions_by_transition: Optional mapping from HPP graph transition
-            names to one action or an ordered sequence of actions to run before
-            matching segments.
+            names to ordered lists of actions to run before matching segments.
         post_actions_by_transition: Optional mapping from HPP graph transition
-            names to one action or an ordered sequence of actions to run after
-            matching segments.
+            names to ordered lists of actions to run after matching segments.
 
     Returns:
         True if all segments and actions succeeded.
     """
-    unmatched_transition_names = _unmatched_transition_names(
-        segments,
-        pre_actions_by_transition,
-        post_actions_by_transition,
-    )
-    if unmatched_transition_names:
-        logger.error(
-            "Transition action map contains unknown transition names: %s",
-            ", ".join(sorted(unmatched_transition_names)),
-        )
-        return False
+    if pre_actions_by_transition is None:
+        pre_actions_by_transition = {}
+    if post_actions_by_transition is None:
+        post_actions_by_transition = {}
 
     for i, segment in enumerate(segments):
         # 1. Pre-actions
-        pre_actions = [
-            *segment.pre_actions,
-            *_actions_for_transition(
-                pre_actions_by_transition,
-                segment.transition_name,
-            ),
-        ]
+        pre_actions = segment.pre_actions + pre_actions_by_transition.get(
+            segment.transition_name, []
+        )
         for action in pre_actions:
             action_name = _action_name(action)
             logger.info("Segment %d: running pre-action '%s'", i, action_name)
@@ -377,13 +334,9 @@ def execute_segments(
             logger.info("Segment %d: single point, skipping trajectory", i)
 
         # 3. Post-actions
-        post_actions = [
-            *segment.post_actions,
-            *_actions_for_transition(
-                post_actions_by_transition,
-                segment.transition_name,
-            ),
-        ]
+        post_actions = segment.post_actions + post_actions_by_transition.get(
+            segment.transition_name, []
+        )
         for action in post_actions:
             action_name = _action_name(action)
             logger.info("Segment %d: running post-action '%s'", i, action_name)
