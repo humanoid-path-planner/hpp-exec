@@ -73,6 +73,7 @@
 ///     segments_by_transition,
 ///     format_segments,
 ///     print_segments,
+///     read_current_configuration,
 ///     configs_to_joint_trajectory,
 ///     extract_joint_config,
 /// )
@@ -390,6 +391,11 @@
 /// passes \c times through unchanged - the caller is responsible for
 /// providing real seconds.
 ///
+/// \c read_current_configuration waits for one
+/// \c sensor_msgs.msg.JointState message and returns joint positions in the
+/// requested order. Use it before planning when the HPP path should start
+/// from the current robot state.
+///
 /// \c extract_joint_config is a one-line slicing helper that returns
 /// <tt>[hpp_config[offset + i] for i in range(n_joints)]</tt> as a list of
 /// floats. \c send_trajectory and \c configs_to_joint_trajectory already
@@ -436,6 +442,8 @@
 /// \li \c actions.py defines reusable helpers for segment actions, including
 ///     \c BackgroundAction for overlapping a blocking action with arm motion.
 /// \li \c segments.py defines the lightweight \c Segment data structure.
+/// \li \c joint_state.py reads ROS 2 \c JointState messages as ordered
+///     configuration vectors.
 /// \li \c trajectory_utils.py extracts selected joints from full HPP
 ///     configuration vectors and converts them to a ROS 2
 ///     \c JointTrajectory message.

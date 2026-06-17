@@ -28,10 +28,20 @@ from hpp_exec.segments import Segment
 
 __version__ = "0.1.0"
 
-_ROS_MODULES = {"rclpy", "control_msgs", "trajectory_msgs", "builtin_interfaces"}
+_ROS_MODULES = {
+    "rclpy",
+    "sensor_msgs",
+    "control_msgs",
+    "trajectory_msgs",
+    "builtin_interfaces",
+}
 _ROS_IMPORT_ERROR = None
 
 try:
+    from hpp_exec.joint_state import (
+        joint_state_to_config,
+        read_current_configuration,
+    )
     from hpp_exec.ros2_sender import (
         execute_segments,
         send_trajectory,
@@ -54,6 +64,8 @@ except ModuleNotFoundError as exc:
     send_trajectory = _missing_ros2
     send_trajectory_async = _missing_ros2
     execute_segments = _missing_ros2
+    joint_state_to_config = _missing_ros2
+    read_current_configuration = _missing_ros2
     configs_to_joint_trajectory = _missing_ros2
     extract_joint_config = _missing_ros2
 
@@ -63,6 +75,8 @@ __all__ = [
     "execute_segments",
     "BackgroundAction",
     "Segment",
+    "joint_state_to_config",
+    "read_current_configuration",
     "configs_to_joint_trajectory",
     "extract_joint_config",
     "segments_from_graph",
