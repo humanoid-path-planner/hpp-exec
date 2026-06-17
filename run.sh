@@ -93,6 +93,7 @@ docker run $TTY_FLAG --rm --net host \
     --privileged \
     $DOCKER_GPU_ARGS \
     $DOCKER_DISPLAY_ARGS \
+    $EXTRA_DOCKER_ARGS \
     -v "$DEVEL_DIR:/home/user/devel" \
     -v "$SCRIPT_DIR:/home/user/devel/hpp-exec" \
     -e "ROS_DOMAIN_ID=$DOMAIN_ID" \
