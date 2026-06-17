@@ -8,6 +8,12 @@
 #
 FROM ros:jazzy
 
+# Upgrade the base so later apt installs do not mix new ROS packages with
+# older base-image libraries (e.g. typesupport vs libfastcdr symbol skew).
+RUN apt-get update -y \
+ && DEBIAN_FRONTEND=noninteractive apt-get dist-upgrade -qqy \
+ && apt-get clean && rm -rf /var/lib/apt/lists/*
+
 # robotpkg repository (HPP C++ packages for Ubuntu 24.04 / Noble)
 RUN apt-get update -y \
  && DEBIAN_FRONTEND=noninteractive apt-get install -qqy curl \
@@ -87,6 +93,18 @@ RUN apt-get update && apt-get install -y python3-rosdep && \
 
 RUN chown -R ${DOCKER_USER}:${DOCKER_GROUP} /opt/franka_ws /home/user
 USER user
+
+# Skip the real-robot packages: they need libfranka, which is not available
+# in this image. The Gazebo demos use joint_trajectory_controller instead.
+RUN cd /opt/franka_ws/src/franka_ros2 && \
+    touch franka_hardware/COLCON_IGNORE \
+          franka_semantic_components/COLCON_IGNORE \
+          franka_example_controllers/COLCON_IGNORE \
+          franka_robot_state_broadcaster/COLCON_IGNORE \
+          franka_mobile/COLCON_IGNORE \
+          franka_gripper/COLCON_IGNORE \
+          franka_bringup/COLCON_IGNORE \
+          franka_selfcollision/COLCON_IGNORE
 
 RUN cd /opt/franka_ws && \
     . /opt/ros/jazzy/setup.sh && \

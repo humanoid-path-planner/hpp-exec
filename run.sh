@@ -47,9 +47,9 @@ mkdir -p "$DEVEL_DIR/ros2_ws/src"
 # Check if hpp-python is built
 if [ ! -d "$DEVEL_DIR/install/lib/python3.12/site-packages/pyhpp" ]; then
     echo "============================================"
-    echo "First run: hpp-manipulation + hpp-python need to be built."
+    echo "First run: the HPP Python stack needs to be built."
     echo "Inside the container, run:"
-    echo "  cd ~/devel/src && make all"
+    echo "  cd ~/devel/src && make hpp-python.install"
     echo "============================================"
     echo ""
 fi
