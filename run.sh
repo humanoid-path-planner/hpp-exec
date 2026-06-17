@@ -6,7 +6,7 @@
 # built from source (devel branch) inside a persistent volume.
 #
 # First run inside container:
-#   cd ~/devel/src && make all
+#   cd ~/devel/src && make hpp-python.install
 #
 # Usage:
 #   ./run.sh                              # interactive bash
