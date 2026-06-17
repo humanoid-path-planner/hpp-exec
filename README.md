@@ -82,6 +82,7 @@ from hpp_exec import (
     BackgroundAction,
     Segment,
     execute_segments,
+    read_current_configuration,
     segments_by_transition,
     print_segments,
     send_trajectory,
@@ -138,6 +139,13 @@ execute_segments(
     pre_actions_by_transition=pre_actions,
     post_actions_by_transition=post_actions,
 )
+
+# Read the robot state before planning from the live position.
+q_start = read_current_configuration(
+    node,
+    joint_names=["joint1", "joint2", ...],
+    topic="/joint_states",
+)
 ```
 
 See the generated Doxygen documentation for `send_trajectory_async()`,
@@ -163,6 +171,7 @@ hpp-exec/
 |-- hpp_exec/           # Python package
 |   |-- __init__.py
 |   |-- actions.py         # Reusable helpers for segment actions
+|   |-- joint_state.py     # Read JointState messages as ordered configs
 |   |-- segments.py        # Segment data structure
 |   |-- trajectory_utils.py # HPP config to ROS2 JointTrajectory conversion
 |   |-- ros2_sender.py     # send_trajectory() via FollowJointTrajectory action
