@@ -1,20 +1,25 @@
 <?xml version='1.0'?>
-<package format='2'>
-  <name>hpp-exec</name>
+<package format='3'>
+  <name>hpp_exec</name>
   <version>0.1.0</version>
   <description>ROS2 execution utilities for HPP-generated trajectories</description>
-
-  <maintainer email="hpp@laas.fr">Paul Sardin</maintainer>
-  <license>BSD</license>
-
   <author>Paul Sardin</author>
+  <maintainer email='guilhem.saurel@laas.fr'>Guilhem Saurel</maintainer>
+  <license>BSD-2-Clause</license>
 
-  <exec_depend>hpp-python</exec_depend>
-  <exec_depend>pyhpp</exec_depend>
+  <exec_depend>hpp_python</exec_depend>
+  <!-- <exec_depend>pyhpp</exec_depend> -->
   <exec_depend>rclpy</exec_depend>
   <exec_depend>sensor_msgs</exec_depend>
   <exec_depend>trajectory_msgs</exec_depend>
   <exec_depend>control_msgs</exec_depend>
   <exec_depend>action_msgs</exec_depend>
   <exec_depend>builtin_interfaces</exec_depend>
+
+  <buildtool_depend>cmake</buildtool_depend>
+  <build_depend>jrl_cmakemodules</build_depend>
+
+  <export>
+    <build_type>cmake</build_type>
+  </export>
 </package>
