@@ -8,7 +8,7 @@
     inputs.gepetto.lib.mkFlakoboros inputs (
       { lib, ... }:
       {
-        overrideAttrs.hpp-exec = {
+        pyOverrideAttrs.hpp-exec = {
           src = lib.fileset.toSource {
             root = ./.;
             fileset = lib.fileset.unions [
