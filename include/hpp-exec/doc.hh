@@ -19,7 +19,8 @@
 /// The package source code is on
 /// <a href="https://github.com/humanoid-path-planner/hpp-exec">GitHub</a>.
 /// End-to-end examples are provided as tutorials 6 and 7 of
-/// <a href="https://github.com/humanoid-path-planner/hpp-tutorial">hpp-tutorial</a>.
+/// <a
+/// href="https://github.com/humanoid-path-planner/hpp-tutorial">hpp-tutorial</a>.
 ///
 /// \section hpp_exec_workflow Typical workflow
 ///
@@ -49,7 +50,8 @@
 /// # 3. Send to ros2_control.
 /// send_trajectory(
 ///     configs, times,
-///     joint_names=["joint1", "joint2", "joint3", "joint4", "joint5", "joint6"],
+///     joint_names=["joint1", "joint2", "joint3", "joint4", "joint5",
+///     "joint6"],
 /// )
 /// \endcode
 ///
@@ -86,16 +88,18 @@
 ///     configs: list[np.ndarray],
 ///     times: list[float],
 ///     joint_names: list[str],
-///     controller_topic: str = "/joint_trajectory_controller/follow_joint_trajectory",
-///     joint_indices: list[int] | None = None,
+///     controller_topic: str =
+///     "/joint_trajectory_controller/follow_joint_trajectory", joint_indices:
+///     list[int] | None = None,
 /// ) -> bool
 ///
 /// send_trajectory_async(
 ///     configs: list[np.ndarray],
 ///     times: list[float],
 ///     joint_names: list[str],
-///     controller_topic: str = "/joint_trajectory_controller/follow_joint_trajectory",
-///     joint_indices: list[int] | None = None,
+///     controller_topic: str =
+///     "/joint_trajectory_controller/follow_joint_trajectory", joint_indices:
+///     list[int] | None = None,
 /// )
 ///
 /// execute_segments(
@@ -104,7 +108,8 @@
 ///     times: list[float],
 ///     joint_names: list[str],
 ///     joint_indices: list[int] | None = None,
-///     controller_topic: str = "/joint_trajectory_controller/follow_joint_trajectory",
+///     controller_topic: str =
+///     "/joint_trajectory_controller/follow_joint_trajectory",
 ///     *,
 ///     pre_actions_by_transition: dict[str, list[Callable]] | None = None,
 ///     post_actions_by_transition: dict[str, list[Callable]] | None = None,
@@ -259,15 +264,17 @@
 ///
 /// \code{.py}
 /// from hpp_exec import execute_segments, print_segments
-/// from hpp_exec.graph_segments import segments_by_transition, segments_from_graph
+/// from hpp_exec.graph_segments import segments_by_transition,
+/// segments_from_graph
 ///
 /// configs, times, segments = segments_from_graph(path, graph)
 /// print_segments(segments)
 ///
 /// # For this known pick-and-place graph:
 /// segments_by_name = segments_by_transition(segments)
-/// segments_by_name["fr3/gripper > box/handle | f_23"][0].pre_actions.append(grasp_box)
-/// segments_by_name["fr3/gripper < box/handle | 0-0_21"][0].pre_actions.append(release_box)
+/// segments_by_name["fr3/gripper > box/handle |
+/// f_23"][0].pre_actions.append(grasp_box) segments_by_name["fr3/gripper <
+/// box/handle | 0-0_21"][0].pre_actions.append(release_box)
 ///
 /// execute_segments(
 ///     segments,

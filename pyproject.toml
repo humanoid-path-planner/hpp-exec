@@ -1,7 +1,3 @@
-[build-system]
-requires = ["setuptools>=61.0", "wheel"]
-build-backend = "setuptools.build_meta"
-
 [project]
 name = "hpp-exec"
 version = "0.1.0"
@@ -26,7 +22,7 @@ classifiers = [
 keywords = ["robotics", "motion-planning", "hpp", "manipulation"]
 dependencies = [
   "numpy",
-  "pinocchio"
+  "pin"
 ]
 
 [project.optional-dependencies]
@@ -34,7 +30,6 @@ viewer = ["viser"]
 dev = [
   "pytest",
   "pytest-cov",
-  "black",
   "ruff"
 ]
 
@@ -42,21 +37,10 @@ dev = [
 Homepage = "https://github.com/humanoid-path-planner"
 Documentation = "https://humanoid-path-planner.github.io/hpp-doc/"
 
-[tool.black]
-line-length = 88
-target-version = ["py38", "py39", "py310", "py311"]
-
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 
-[tool.ruff]
-line-length = 88
-
 [tool.ruff.lint]
 select = ["E", "F", "W", "I"]
 ignore = ["E501"]
-
-[tool.setuptools.packages.find]
-where = ["."]
-include = ["hpp_exec*"]
