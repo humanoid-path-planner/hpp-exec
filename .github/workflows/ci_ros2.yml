@@ -11,6 +11,18 @@ jobs:
       matrix:
         env:
           - {ROS_DISTRO: rolling}
+    env:
+      UPSTREAM_WORKSPACE: |
+        github:gepetto/example-robot-data#devel
+        github:humanoid-path-planner/hpp-constraints#devel
+        github:humanoid-path-planner/hpp-core#devel
+        github:humanoid-path-planner/hpp-environments#devel
+        github:humanoid-path-planner/hpp-manipulation#devel
+        github:humanoid-path-planner/hpp-manipulation-urdf#devel
+        github:humanoid-path-planner/hpp-pinocchio#devel
+        github:humanoid-path-planner/hpp-python#devel
+        github:humanoid-path-planner/hpp-statistics#devel
+        github:humanoid-path-planner/hpp-util#devel
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
