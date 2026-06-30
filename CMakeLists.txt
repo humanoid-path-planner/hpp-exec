@@ -22,10 +22,7 @@ if(jrl-cmakemodules_FOUND)
         TARGET jrl-cmakemodules::jrl-cmakemodules
         PROPERTY INTERFACE_INCLUDE_DIRECTORIES
     )
-    message(
-        STATUS
-        "JRL cmakemodules found on system at ${JRL_CMAKE_MODULES}"
-    )
+    message(STATUS "JRL cmakemodules found on system at ${JRL_CMAKE_MODULES}")
 else()
     message(STATUS "JRL cmakemodules not found. Let's fetch it.")
     include(FetchContent)
@@ -34,10 +31,7 @@ else()
         GIT_REPOSITORY "https://github.com/jrl-umi3218/jrl-cmakemodules.git"
     )
     FetchContent_MakeAvailable("jrl-cmakemodules")
-    FetchContent_GetProperties(
-        "jrl-cmakemodules"
-        SOURCE_DIR JRL_CMAKE_MODULES
-    )
+    FetchContent_GetProperties("jrl-cmakemodules" SOURCE_DIR JRL_CMAKE_MODULES)
 endif()
 
 include("${JRL_CMAKE_MODULES}/hpp.cmake")
