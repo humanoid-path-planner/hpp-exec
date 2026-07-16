@@ -1,0 +1,6 @@
+[hpp-exec]
+url = "."
+src_deps = ["hpp-python"]
+
+[hpp-python]
+url = "github:humanoid-path-planner"
