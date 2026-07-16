@@ -1,6 +1,6 @@
 [project]
 name = "hpp-exec"
-version = "0.1.0"
+version = "9.0.0"
 description = "ROS2 execution utilities for HPP-generated trajectories"
 readme = "README.md"
 license = "BSD-2-Clause"
