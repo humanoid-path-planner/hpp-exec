@@ -43,6 +43,7 @@ compute_project_args(PROJECT_ARGS LANGUAGES CXX)
 project(${PROJECT_NAME} ${PROJECT_ARGS})
 
 if(NOT FINDPYTHON_ALREADY_CALLED)
+    set(PYTHON_COMPONENTS Interpreter)
     findpython()
 endif()
 
