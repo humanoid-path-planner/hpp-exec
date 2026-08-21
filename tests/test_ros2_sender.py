@@ -2,6 +2,7 @@
 
 import threading
 import time
+from unittest.mock import Mock
 
 import numpy as np
 import pytest
@@ -52,6 +53,62 @@ def test_trajectory_type_support_import_is_serialized(monkeypatch):
 
     assert all(not thread.is_alive() for thread in threads)
     assert max_active_calls == 1
+
+
+def test_send_and_wait_rejects_aborted_result_with_successful_error_code(monkeypatch):
+    ros2_sender = _ros2_sender()
+    trajectory_msgs = pytest.importorskip("trajectory_msgs.msg")
+
+    result = Mock(status=ros2_sender.GoalStatus.STATUS_ABORTED)
+    result.result.error_code = ros2_sender.FollowJointTrajectory.Result.SUCCESSFUL
+    result.result.error_string = ""
+    result_future = Mock()
+    result_future.result.return_value = result
+    goal_handle = Mock(accepted=True)
+    goal_handle.get_result_async.return_value = result_future
+    goal_future = Mock()
+    goal_future.result.return_value = goal_handle
+    client = Mock()
+    client.wait_for_server.return_value = True
+    client.send_goal_async.return_value = goal_future
+
+    monkeypatch.setattr(ros2_sender, "SingleThreadedExecutor", Mock)
+
+    node = Mock(client=client)
+    trajectory = ros2_sender.FollowJointTrajectory.Goal().trajectory
+    point = trajectory_msgs.JointTrajectoryPoint()
+    point.time_from_start.sec = 1
+    trajectory.points.append(point)
+    trajectory.joint_names = ["joint"]
+
+    assert not ros2_sender._TrajectorySenderNode.send_and_wait(node, trajectory)
+
+
+def test_send_and_wait_cancels_timed_out_goal(monkeypatch):
+    ros2_sender = _ros2_sender()
+    trajectory_msgs = pytest.importorskip("trajectory_msgs.msg")
+
+    result_future = Mock()
+    result_future.result.return_value = None
+    goal_handle = Mock(accepted=True)
+    goal_handle.get_result_async.return_value = result_future
+    goal_future = Mock()
+    goal_future.result.return_value = goal_handle
+    client = Mock()
+    client.wait_for_server.return_value = True
+    client.send_goal_async.return_value = goal_future
+
+    monkeypatch.setattr(ros2_sender, "SingleThreadedExecutor", Mock)
+
+    node = Mock(client=client)
+    trajectory = ros2_sender.FollowJointTrajectory.Goal().trajectory
+    point = trajectory_msgs.JointTrajectoryPoint()
+    point.time_from_start.sec = 1
+    trajectory.points.append(point)
+    trajectory.joint_names = ["joint"]
+
+    assert not ros2_sender._TrajectorySenderNode.send_and_wait(node, trajectory)
+    goal_handle.cancel_goal_async.assert_called_once_with()
 
 
 def test_execute_segments_runs_transition_action_lists(monkeypatch):
