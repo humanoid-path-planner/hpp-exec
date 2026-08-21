@@ -75,7 +75,7 @@ docker rm -f "$CONTAINER_NAME" 2>/dev/null || true
 
 # GPU support
 DOCKER_GPU_ARGS=""
-if command -v nvidia-smi &>/dev/null && docker info 2>/dev/null | grep -q nvidia; then
+if nvidia-smi &>/dev/null && docker info 2>/dev/null | grep -q nvidia; then
     DOCKER_GPU_ARGS="--gpus all"
 fi
 
