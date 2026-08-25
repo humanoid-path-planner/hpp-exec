@@ -39,6 +39,7 @@ _ROS_IMPORT_ERROR = None
 
 try:
     from hpp_exec.joint_state import (
+        JointStateReader,
         joint_state_to_config,
         read_current_configuration,
     )
@@ -64,6 +65,7 @@ except ModuleNotFoundError as exc:
     send_trajectory = _missing_ros2
     send_trajectory_async = _missing_ros2
     execute_segments = _missing_ros2
+    JointStateReader = _missing_ros2
     joint_state_to_config = _missing_ros2
     read_current_configuration = _missing_ros2
     configs_to_joint_trajectory = _missing_ros2
@@ -75,6 +77,7 @@ __all__ = [
     "execute_segments",
     "BackgroundAction",
     "Segment",
+    "JointStateReader",
     "joint_state_to_config",
     "read_current_configuration",
     "configs_to_joint_trajectory",

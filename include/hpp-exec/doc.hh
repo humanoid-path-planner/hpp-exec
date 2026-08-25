@@ -65,6 +65,7 @@
 ///
 /// \code{.py}
 /// from hpp_exec import (
+///     JointStateReader,
 ///     Segment,
 ///     send_trajectory,
 ///     send_trajectory_async,
@@ -390,6 +391,11 @@
 /// waypoints are left empty so the controller smooths between them), and
 /// passes \c times through unchanged - the caller is responsible for
 /// providing real seconds.
+///
+/// \c JointStateReader stores positions in the order received from a
+/// \c sensor_msgs.msg.JointState topic. Use
+/// \c read_current_configuration instead when positions need to be reordered
+/// by joint name.
 ///
 /// \c read_current_configuration waits for one
 /// \c sensor_msgs.msg.JointState message and returns joint positions in the
