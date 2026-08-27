@@ -42,6 +42,7 @@ from typing import Callable, List, Optional
 
 import numpy as np
 import rclpy
+from action_msgs.msg import GoalStatus
 from control_msgs.action import FollowJointTrajectory
 from rclpy.action import ActionClient
 from rclpy.executors import SingleThreadedExecutor
@@ -138,7 +139,17 @@ class _TrajectorySenderNode(Node):
 
             result = result_future.result()
             if result is None:
-                self.get_logger().error("Trajectory execution timed out")
+                cancel_future = goal_handle.cancel_goal_async()
+                executor.spin_until_future_complete(cancel_future, timeout_sec=10.0)
+                self.get_logger().error(
+                    "Trajectory execution timed out; cancellation requested"
+                )
+                return False
+
+            if result.status != GoalStatus.STATUS_SUCCEEDED:
+                self.get_logger().error(
+                    "Trajectory execution failed with status %d", result.status
+                )
                 return False
 
             if result.result.error_code != FollowJointTrajectory.Result.SUCCESSFUL:

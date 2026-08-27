@@ -1,7 +1,26 @@
 """Tests for joint state helpers."""
 
+from types import SimpleNamespace
+
 import numpy as np
 import pytest
+
+
+def test_joint_state_reader_preserves_message_order():
+    pytest.importorskip("sensor_msgs")
+
+    from sensor_msgs.msg import JointState
+
+    from hpp_exec import JointStateReader
+
+    message = JointState()
+    message.name = ["joint_2", "joint_1"]
+    message.position = [2.0, 1.0]
+    reader = SimpleNamespace(current_configuration=None)
+
+    JointStateReader._store_configuration(reader, message)
+
+    np.testing.assert_allclose(reader.current_configuration, [2.0, 1.0])
 
 
 def test_joint_state_to_config_orders_and_strips_gazebo_prefix():

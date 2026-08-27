@@ -9,6 +9,24 @@ from rclpy.node import Node
 from sensor_msgs.msg import JointState
 
 
+class JointStateReader(Node):
+    """Store joint positions from a ROS 2 JointState topic in message order."""
+
+    def __init__(self, topic: str = "/joint_states"):
+        super().__init__("joint_state_reader")
+        self.current_configuration: np.ndarray | None = None
+        self.subscription = self.create_subscription(
+            JointState, topic, self._store_configuration, 10
+        )
+
+    def _store_configuration(self, message: JointState) -> None:
+        self.current_configuration = np.array(message.position)
+
+    def get_current_configuration(self) -> np.ndarray | None:
+        """Return the latest positions in the order received."""
+        return self.current_configuration
+
+
 def joint_state_to_config(
     message: JointState,
     joint_names: Sequence[str],

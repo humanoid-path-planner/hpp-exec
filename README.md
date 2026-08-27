@@ -80,6 +80,7 @@ cd ~/devel/src && make all
 ```python
 from hpp_exec import (
     BackgroundAction,
+    JointStateReader,
     Segment,
     execute_segments,
     read_current_configuration,
@@ -141,6 +142,12 @@ execute_segments(
 )
 
 # Read the robot state before planning from the live position.
+reader = JointStateReader("/joint_states")
+while reader.get_current_configuration() is None:
+    rclpy.spin_once(reader)
+q_start = reader.get_current_configuration()
+
+# Reorder by joint name when message order is not guaranteed.
 q_start = read_current_configuration(
     node,
     joint_names=["joint1", "joint2", ...],
