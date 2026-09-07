@@ -23,10 +23,14 @@ class _GraphSegment:
 
 
 def _path_ranges(path) -> list[tuple[float, float]]:
+    from pyhpp.core.path import Vector
+
+    flat = Vector(path.outputSize(), path.outputDerivativeSize())
+    path.flatten(flat)
     ranges = []
     cursor = 0.0
-    for rank in range(int(path.numberPaths())):
-        length = float(path.pathAtRank(rank).length())
+    for rank in range(flat.numberPaths()):
+        length = float(flat.pathAtRank(rank).length())
         end = cursor + length
         if end - cursor > _PARAM_EPS:
             ranges.append((cursor, end))
@@ -123,19 +127,26 @@ def segments_from_graph(
     for graph_segment in graph_segments:
         start_index = _time_index(times, graph_segment.start_time)
         end_index = _time_index(times, graph_segment.end_time) + 1
-        segments.append(
-            Segment(
-                start_index,
-                end_index,
-                start_time=graph_segment.start_time,
-                end_time=graph_segment.end_time,
-                transition_name=graph_segment.transition_name,
-                state_before=graph_segment.state_before,
-                state_after=graph_segment.state_after,
-                actual_state_before=graph_segment.actual_state_before,
-                actual_state_after=graph_segment.actual_state_after,
-            )
+        segment = Segment(
+            start_index,
+            end_index,
+            start_time=graph_segment.start_time,
+            end_time=graph_segment.end_time,
+            transition_name=graph_segment.transition_name,
+            state_before=graph_segment.state_before,
+            state_after=graph_segment.state_after,
+            actual_state_before=graph_segment.actual_state_before,
+            actual_state_after=graph_segment.actual_state_after,
         )
+        # Optimizers may split one graph transition into adjacent direct paths.
+        if segments and segments[-1].transition_name == segment.transition_name:
+            previous = segments[-1]
+            previous.end_index = segment.end_index
+            previous.end_time = segment.end_time
+            previous.state_after = segment.state_after
+            previous.actual_state_after = segment.actual_state_after
+        else:
+            segments.append(segment)
 
     if not segments:
         segments.append(Segment(0, len(configs), start_time=0.0, end_time=length))

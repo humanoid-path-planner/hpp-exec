@@ -1,6 +1,7 @@
 """Tests for graph segment execution."""
 
 import numpy as np
+import pytest
 
 
 class MockTransition:
@@ -13,30 +14,27 @@ class MockTransition:
         return self._name
 
 
-class MockSubPath:
-    def __init__(self, length: float):
-        self._length = length
+def make_path_vector(subpaths, start=0.0):
+    pytest.importorskip("pyhpp")
+    from pyhpp.core import StraightPath, interval
+    from pyhpp.core.path import Vector
+    from pyhpp.pinocchio import LiegroupSpace
 
-    def length(self):
-        return self._length
-
-
-class MockPathVector:
-    def __init__(self, subpath_lengths: list[float]):
-        self._subpaths = [MockSubPath(length) for length in subpath_lengths]
-        self._length = sum(subpath_lengths)
-
-    def length(self):
-        return self._length
-
-    def numberPaths(self):
-        return len(self._subpaths)
-
-    def pathAtRank(self, rank):
-        return self._subpaths[rank]
-
-    def __call__(self, param):
-        return np.array([float(param)]), True
+    path = Vector(1, 1)
+    for subpath in subpaths:
+        if isinstance(subpath, list):
+            leaf = make_path_vector(subpath, start)
+        else:
+            leaf = StraightPath(
+                LiegroupSpace.R1(False),
+                np.array([start]),
+                np.array([start + subpath]),
+                interval(0.0, subpath),
+                None,
+            )
+        path.appendPath(leaf)
+        start += leaf.length()
+    return path
 
 
 class PathAwareGraph:
@@ -84,7 +82,7 @@ def windowed_pick_place_graph():
 def test_segments_from_graph_returns_hpp_segments():
     from hpp_exec.graph_segments import segments_from_graph
 
-    path = MockPathVector([4.8, 0.4, 4.8, 0.4])
+    path = make_path_vector([4.8, 0.4, 4.8, 0.4])
     graph = windowed_pick_place_graph()
 
     configs, times, segments = segments_from_graph(
@@ -122,7 +120,7 @@ def test_user_adds_actions_manually_to_chosen_segments():
 
     calls = []
     _, _, segments = segments_from_graph(
-        MockPathVector([4.8, 0.4, 4.8, 0.4]),
+        make_path_vector([4.8, 0.4, 4.8, 0.4]),
         windowed_pick_place_graph(),
         sample_params=[0.0, 10.4],
     )
@@ -135,11 +133,79 @@ def test_user_adds_actions_manually_to_chosen_segments():
     assert calls == ["close", "open"]
 
 
+def test_nested_path_vectors_keep_every_transition_boundary():
+    from hpp_exec.graph_segments import segments_from_graph
+
+    transitions = [
+        MockTransition(f"transition {index}", "state", "state") for index in range(4)
+    ]
+    graph = PathAwareGraph(
+        [
+            (0.0, 1.0, transitions[0]),
+            (1.0, 2.0, transitions[1]),
+            (2.0, 3.0, transitions[2]),
+            (3.0, 4.0, transitions[3]),
+        ],
+        [(0.0, 4.0, "state")],
+    )
+    path = make_path_vector([1.0, [1.0, 1.0], 1.0])
+
+    _, times, segments = segments_from_graph(
+        path,
+        graph,
+        sample_params=[0.0, 4.0],
+    )
+
+    assert graph.queried_params == [0.5, 1.5, 2.5, 3.5]
+    assert path.numberPaths() == 3
+    assert path.pathAtRank(1).numberPaths() == 2
+    assert times == [0.0, 1.0, 2.0, 3.0, 4.0]
+    assert [segment.transition_name for segment in segments] == [
+        "transition 0",
+        "transition 1",
+        "transition 2",
+        "transition 3",
+    ]
+
+
+def test_adjacent_leaves_with_same_transition_are_one_segment():
+    from hpp_exec.graph_segments import segments_from_graph
+
+    loop = MockTransition("loop", "state", "state")
+    exit_transition = MockTransition("exit", "state", "done")
+    graph = PathAwareGraph(
+        [
+            (0.0, 3.0, loop),
+            (3.0, 4.0, exit_transition),
+        ],
+        [
+            (0.0, 3.0, "state"),
+            (3.0, 4.0, "done"),
+        ],
+    )
+    path = make_path_vector([1.0, [1.0, 1.0], 1.0])
+
+    _, times, segments = segments_from_graph(
+        path,
+        graph,
+        sample_params=[0.0, 4.0],
+    )
+
+    assert times == [0.0, 1.0, 2.0, 3.0, 4.0]
+    assert len(segments) == 2
+    assert segments[0].transition_name == "loop"
+    assert segments[0].start_time == 0.0
+    assert segments[0].end_time == 3.0
+    assert (segments[0].start_index, segments[0].end_index) == (0, 4)
+    assert segments[1].transition_name == "exit"
+    assert (segments[1].start_index, segments[1].end_index) == (3, 5)
+
+
 def test_format_segments_shows_timing_state_and_actions():
     from hpp_exec.graph_segments import format_segments, segments_from_graph
 
     _, _, segments = segments_from_graph(
-        MockPathVector([4.8, 0.4, 4.8, 0.4]),
+        make_path_vector([4.8, 0.4, 4.8, 0.4]),
         windowed_pick_place_graph(),
         sample_params=[0.0, 10.4],
     )
