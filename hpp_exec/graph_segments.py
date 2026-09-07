@@ -23,18 +23,14 @@ class _GraphSegment:
 
 
 def _path_ranges(path) -> list[tuple[float, float]]:
+    from pyhpp.core.path import Vector
+
+    flat = Vector(path.outputSize(), path.outputDerivativeSize())
+    path.flatten(flat)
     ranges = []
     cursor = 0.0
-
-    def leaf_lengths(path_vector):
-        for rank in range(int(path_vector.numberPaths())):
-            subpath = path_vector.pathAtRank(rank)
-            if hasattr(subpath, "numberPaths"):
-                yield from leaf_lengths(subpath)
-            else:
-                yield float(subpath.length())
-
-    for length in leaf_lengths(path):
+    for rank in range(flat.numberPaths()):
+        length = float(flat.pathAtRank(rank).length())
         end = cursor + length
         if end - cursor > _PARAM_EPS:
             ranges.append((cursor, end))
