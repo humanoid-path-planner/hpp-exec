@@ -22,9 +22,12 @@ class MockSubPath:
 
 
 class MockPathVector:
-    def __init__(self, subpath_lengths: list[float]):
-        self._subpaths = [MockSubPath(length) for length in subpath_lengths]
-        self._length = sum(subpath_lengths)
+    def __init__(self, subpaths):
+        self._subpaths = [
+            MockSubPath(subpath) if isinstance(subpath, (int, float)) else subpath
+            for subpath in subpaths
+        ]
+        self._length = sum(subpath.length() for subpath in self._subpaths)
 
     def length(self):
         return self._length
@@ -133,6 +136,72 @@ def test_user_adds_actions_manually_to_chosen_segments():
     assert segments[1].pre_actions[0]()
     assert segments[3].post_actions[0]()
     assert calls == ["close", "open"]
+
+
+def test_nested_path_vectors_keep_every_transition_boundary():
+    from hpp_exec.graph_segments import segments_from_graph
+
+    transitions = [
+        MockTransition(f"transition {index}", "state", "state") for index in range(4)
+    ]
+    graph = PathAwareGraph(
+        [
+            (0.0, 1.0, transitions[0]),
+            (1.0, 2.0, transitions[1]),
+            (2.0, 3.0, transitions[2]),
+            (3.0, 4.0, transitions[3]),
+        ],
+        [(0.0, 4.0, "state")],
+    )
+    path = MockPathVector([1.0, MockPathVector([1.0, 1.0]), 1.0])
+
+    _, times, segments = segments_from_graph(
+        path,
+        graph,
+        sample_params=[0.0, 4.0],
+    )
+
+    assert graph.queried_params == [0.5, 1.5, 2.5, 3.5]
+    assert times == [0.0, 1.0, 2.0, 3.0, 4.0]
+    assert [segment.transition_name for segment in segments] == [
+        "transition 0",
+        "transition 1",
+        "transition 2",
+        "transition 3",
+    ]
+
+
+def test_adjacent_leaves_with_same_transition_are_one_segment():
+    from hpp_exec.graph_segments import segments_from_graph
+
+    loop = MockTransition("loop", "state", "state")
+    exit_transition = MockTransition("exit", "state", "done")
+    graph = PathAwareGraph(
+        [
+            (0.0, 3.0, loop),
+            (3.0, 4.0, exit_transition),
+        ],
+        [
+            (0.0, 3.0, "state"),
+            (3.0, 4.0, "done"),
+        ],
+    )
+    path = MockPathVector([1.0, MockPathVector([1.0, 1.0]), 1.0])
+
+    _, times, segments = segments_from_graph(
+        path,
+        graph,
+        sample_params=[0.0, 4.0],
+    )
+
+    assert times == [0.0, 1.0, 2.0, 3.0, 4.0]
+    assert len(segments) == 2
+    assert segments[0].transition_name == "loop"
+    assert segments[0].start_time == 0.0
+    assert segments[0].end_time == 3.0
+    assert (segments[0].start_index, segments[0].end_index) == (0, 4)
+    assert segments[1].transition_name == "exit"
+    assert (segments[1].start_index, segments[1].end_index) == (3, 5)
 
 
 def test_format_segments_shows_timing_state_and_actions():
