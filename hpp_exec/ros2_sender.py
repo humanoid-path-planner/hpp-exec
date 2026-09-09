@@ -87,6 +87,23 @@ def _action_name(action) -> str:
     )
 
 
+def _cancel_goal(executor, goal_handle, result_future):
+    cancel_future = goal_handle.cancel_goal_async()
+    executor.spin_until_future_complete(cancel_future, timeout_sec=5.0)
+    response = cancel_future.result()
+    if response is None or response.return_code != 0:
+        return False
+    executor.spin_until_future_complete(result_future, timeout_sec=5.0)
+    result = result_future.result()
+    return result is not None and (
+        result.status == GoalStatus.STATUS_CANCELED
+        or (
+            result.status == GoalStatus.STATUS_SUCCEEDED
+            and result.result.error_code == FollowJointTrajectory.Result.SUCCESSFUL
+        )
+    )
+
+
 class _TrajectorySenderNode(Node):
     """Internal node for sending trajectories."""
 
@@ -99,10 +116,14 @@ class _TrajectorySenderNode(Node):
         self.client = ActionClient(self, FollowJointTrajectory, controller_topic)
         self._result = None
 
-    def send_and_wait(self, trajectory, timeout_sec: float = 60.0) -> bool:
+    def send_and_wait(
+        self, trajectory, timeout_sec: float = 60.0, *, wait_for_completion=None
+    ) -> bool:
         """Send trajectory and wait for execution to complete."""
         executor = SingleThreadedExecutor()
         executor.add_node(self)
+        future = goal_handle = result_future = None
+        completed = cancel_requested = False
         try:
             if not self.client.wait_for_server(timeout_sec=10.0):
                 self.get_logger().error("Trajectory controller not available")
@@ -111,16 +132,8 @@ class _TrajectorySenderNode(Node):
             goal = FollowJointTrajectory.Goal()
             goal.trajectory = trajectory
 
-            # Compute expected duration from last trajectory point
-            last_point = trajectory.points[-1]
-            duration = (
-                last_point.time_from_start.sec
-                + last_point.time_from_start.nanosec * 1e-9
-            )
-
-            self.get_logger().info(
-                f"Sending trajectory: {len(trajectory.points)} points, "
-                f"{len(trajectory.joint_names)} joints, {duration:.1f}s"
+            self.get_logger().debug(
+                f"Sending trajectory: {len(trajectory.points)} points"
             )
 
             future = self.client.send_goal_async(goal)
@@ -131,40 +144,64 @@ class _TrajectorySenderNode(Node):
                 self.get_logger().error("Trajectory goal rejected")
                 return False
 
-            self.get_logger().info("Trajectory accepted, executing...")
-
-            # Wait for execution to complete
             result_future = goal_handle.get_result_async()
-            executor.spin_until_future_complete(result_future, timeout_sec=timeout_sec)
+            if wait_for_completion is None:
+                executor.spin_until_future_complete(
+                    result_future, timeout_sec=timeout_sec
+                )
+            else:
+                # The caller spins this node while observing controller feedback.
+                executor.remove_node(self)
+                try:
+                    wait_for_completion(self, result_future)
+                finally:
+                    executor.add_node(self)
+                if not result_future.done():
+                    cancel_requested = True
+                    completed = _cancel_goal(executor, goal_handle, result_future)
+                    if not completed:
+                        self.get_logger().error("Trajectory closure not confirmed")
+                    return completed
 
             result = result_future.result()
             if result is None:
-                cancel_future = goal_handle.cancel_goal_async()
-                executor.spin_until_future_complete(cancel_future, timeout_sec=10.0)
-                self.get_logger().error(
-                    "Trajectory execution timed out; cancellation requested"
-                )
+                self.get_logger().error("Trajectory execution timed out")
                 return False
 
             if result.status != GoalStatus.STATUS_SUCCEEDED:
                 self.get_logger().error(
-                    "Trajectory execution failed with status %d", result.status
+                    f"Trajectory execution failed with status {result.status}"
                 )
                 return False
 
             if result.result.error_code != FollowJointTrajectory.Result.SUCCESSFUL:
                 self.get_logger().error(
-                    "Trajectory execution failed with error code %d: %s",
-                    result.result.error_code,
-                    result.result.error_string,
+                    f"Trajectory execution failed with error code "
+                    f"{result.result.error_code}: {result.result.error_string}"
                 )
                 return False
 
-            self.get_logger().info("Trajectory execution complete")
+            completed = True
+            self.get_logger().debug("Trajectory execution complete")
             return True
         finally:
-            executor.remove_node(self)
-            executor.shutdown()
+            try:
+                if not completed and not cancel_requested and future is not None:
+                    if goal_handle is None:
+                        executor.spin_until_future_complete(future, timeout_sec=5.0)
+                        goal_handle = future.result()
+                    if goal_handle is not None and goal_handle.accepted:
+                        if result_future is None:
+                            result_future = goal_handle.get_result_async()
+                        if not _cancel_goal(executor, goal_handle, result_future):
+                            self.get_logger().error(
+                                "Trajectory cancellation not confirmed"
+                            )
+                    elif goal_handle is None:
+                        self.get_logger().error("Trajectory acceptance unknown")
+            finally:
+                executor.remove_node(self)
+                executor.shutdown()
 
 
 def send_trajectory(
@@ -173,6 +210,9 @@ def send_trajectory(
     joint_names: List[str],
     controller_topic: str = "/joint_trajectory_controller/follow_joint_trajectory",
     joint_indices: Optional[List[int]] = None,
+    *,
+    positions_only: bool = False,
+    wait_for_completion=None,
 ) -> bool:
     """
     Send a trajectory to ros2_control.
@@ -183,6 +223,12 @@ def send_trajectory(
         joint_names: ROS2 joint names in order.
         controller_topic: FollowJointTrajectory action topic.
         joint_indices: Indices to extract from each config (default: 0..len(joint_names)).
+        positions_only: Leave velocities empty to use the controller's speed setting.
+        wait_for_completion: Optional blocking callable(node, result_future).
+            It spins node, checks feedback and raises on failure. It must return
+            only after confirming that the robot reached its target and stopped.
+            A still-pending ROS goal is then canceled and its closure checked.
+            The callable owns its waiting deadline; the default wait is 60 seconds.
 
     Returns:
         True if trajectory executed successfully.
@@ -210,12 +256,17 @@ def send_trajectory(
         joint_indices=joint_indices,
     )
 
+    if positions_only:
+        for point in trajectory.points:
+            point.velocities = []
+
     _ensure_rclpy_initialized()
 
     node = _TrajectorySenderNode(controller_topic)
     try:
-        return node.send_and_wait(trajectory)
+        return node.send_and_wait(trajectory, wait_for_completion=wait_for_completion)
     finally:
+        node.client.destroy()
         node.destroy_node()
 
 
@@ -272,6 +323,8 @@ def execute_segments(
     *,
     pre_actions_by_transition: dict[str, list[Action]] | None = None,
     post_actions_by_transition: dict[str, list[Action]] | None = None,
+    positions_only: bool = False,
+    wait_for_completion=None,
 ) -> bool:
     """Execute trajectory segments with pre/post action hooks.
 
@@ -293,6 +346,11 @@ def execute_segments(
             names to ordered lists of actions to run before matching segments.
         post_actions_by_transition: Optional mapping from HPP graph transition
             names to ordered lists of actions to run after matching segments.
+        positions_only: Forward positions without velocities to the controller.
+        wait_for_completion: Optional callable(node, result_future, segment_configs).
+            It follows the send_trajectory completion contract for each segment.
+            segment_configs contains the same configuration vectors as configs;
+            joint_indices applies only to the sent trajectory.
 
     Returns:
         True if all segments and actions succeeded.
@@ -336,6 +394,14 @@ def execute_segments(
                 joint_names,
                 controller_topic=controller_topic,
                 joint_indices=joint_indices,
+                positions_only=positions_only,
+                wait_for_completion=(
+                    None
+                    if wait_for_completion is None
+                    else lambda node, result, points=seg_configs: wait_for_completion(
+                        node, result, points
+                    )
+                ),
             )
 
             if not success:
