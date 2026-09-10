@@ -162,9 +162,9 @@ See the generated Doxygen documentation for `send_trajectory_async()`,
 their configured speed when velocities are omitted. Its optional
 `wait_for_completion(node, result_future)` callback can wait for measured
 arrival and a stopped controller. The callback spins the supplied node and
-raises on failure. Once it returns, hpp-exec checks the ROS result or cancels
-and confirms closure of a still-pending goal. Failed or interrupted waits also
-request cancellation. Without this callback, the existing ROS-result wait
+raises on failure. Once it returns, hpp-exec waits up to five seconds for a
+successful ROS result. Failed, timed-out or interrupted waits request
+cancellation. Without this callback, the existing ROS-result wait
 and 60-second timeout apply.
 
 `execute_segments()` accepts these same two options. Its completion callback

@@ -123,7 +123,7 @@ class _TrajectorySenderNode(Node):
         executor = SingleThreadedExecutor()
         executor.add_node(self)
         future = goal_handle = result_future = None
-        completed = cancel_requested = False
+        completed = False
         try:
             if not self.client.wait_for_server(timeout_sec=10.0):
                 self.get_logger().error("Trajectory controller not available")
@@ -156,12 +156,7 @@ class _TrajectorySenderNode(Node):
                     wait_for_completion(self, result_future)
                 finally:
                     executor.add_node(self)
-                if not result_future.done():
-                    cancel_requested = True
-                    completed = _cancel_goal(executor, goal_handle, result_future)
-                    if not completed:
-                        self.get_logger().error("Trajectory closure not confirmed")
-                    return completed
+                executor.spin_until_future_complete(result_future, timeout_sec=5.0)
 
             result = result_future.result()
             if result is None:
@@ -186,7 +181,7 @@ class _TrajectorySenderNode(Node):
             return True
         finally:
             try:
-                if not completed and not cancel_requested and future is not None:
+                if not completed and future is not None:
                     if goal_handle is None:
                         executor.spin_until_future_complete(future, timeout_sec=5.0)
                         goal_handle = future.result()
@@ -229,7 +224,7 @@ def send_trajectory(
         wait_for_completion: Optional blocking callable(node, result_future).
             It spins node, checks feedback and raises on failure. It must return
             only after confirming that the robot reached its target and stopped.
-            A still-pending ROS goal is then canceled and its closure checked.
+            The ROS result is then awaited for up to five seconds.
             The callable owns its waiting deadline; the default wait is 60 seconds.
 
     Returns:
