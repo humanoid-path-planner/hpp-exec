@@ -212,6 +212,7 @@ def send_trajectory(
     joint_indices: Optional[List[int]] = None,
     *,
     positions_only: bool = False,
+    velocities: Optional[List[np.ndarray]] = None,
     wait_for_completion=None,
 ) -> bool:
     """
@@ -224,6 +225,7 @@ def send_trajectory(
         controller_topic: FollowJointTrajectory action topic.
         joint_indices: Indices to extract from each config (default: 0..len(joint_names)).
         positions_only: Leave velocities empty to use the controller's speed setting.
+        velocities: Optional joint velocity vectors, in the same order as configs.
         wait_for_completion: Optional blocking callable(node, result_future).
             It spins node, checks feedback and raises on failure. It must return
             only after confirming that the robot reached its target and stopped.
@@ -248,12 +250,20 @@ def send_trajectory(
             joint_names=["shoulder_pan", "shoulder_lift", "elbow", ...],
         )
     """
+    if positions_only and velocities is not None:
+        raise ValueError("Choose positions_only or explicit velocities")
+    if velocities is not None:
+        values = np.asarray(velocities)
+        if values.shape != np.asarray(configs).shape or not np.isfinite(values).all():
+            raise ValueError("Expected one finite velocity vector per configuration")
+
     # Convert to ROS2 message
     trajectory = configs_to_joint_trajectory(
         configs,
         times,
         joint_names,
         joint_indices=joint_indices,
+        velocities=velocities,
     )
 
     if positions_only:
@@ -324,6 +334,7 @@ def execute_segments(
     pre_actions_by_transition: dict[str, list[Action]] | None = None,
     post_actions_by_transition: dict[str, list[Action]] | None = None,
     positions_only: bool = False,
+    velocities: Optional[List[np.ndarray]] = None,
     wait_for_completion=None,
 ) -> bool:
     """Execute trajectory segments with pre/post action hooks.
@@ -347,6 +358,7 @@ def execute_segments(
         post_actions_by_transition: Optional mapping from HPP graph transition
             names to ordered lists of actions to run after matching segments.
         positions_only: Forward positions without velocities to the controller.
+        velocities: Optional joint velocity vectors, sliced with each segment.
         wait_for_completion: Optional callable(node, result_future, segment_configs).
             It follows the send_trajectory completion contract for each segment.
             segment_configs contains the same configuration vectors as configs;
@@ -355,6 +367,16 @@ def execute_segments(
     Returns:
         True if all segments and actions succeeded.
     """
+    if positions_only and velocities is not None:
+        raise ValueError("Choose positions_only or explicit velocities")
+    if velocities is not None:
+        velocities = np.asarray(velocities)
+        if (
+            velocities.shape != np.asarray(configs).shape
+            or not np.isfinite(velocities).all()
+        ):
+            raise ValueError("Expected one finite velocity vector per configuration")
+
     if pre_actions_by_transition is None:
         pre_actions_by_transition = {}
     if post_actions_by_transition is None:
@@ -395,6 +417,11 @@ def execute_segments(
                 controller_topic=controller_topic,
                 joint_indices=joint_indices,
                 positions_only=positions_only,
+                velocities=(
+                    None
+                    if velocities is None
+                    else velocities[segment.start_index : segment.end_index]
+                ),
                 wait_for_completion=(
                     None
                     if wait_for_completion is None
