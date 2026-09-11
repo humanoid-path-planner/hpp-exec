@@ -158,6 +158,20 @@ q_start = read_current_configuration(
 See the generated Doxygen documentation for `send_trajectory_async()`,
 `configs_to_joint_trajectory()`, and other lower-level helpers.
 
+`send_trajectory()` accepts `positions_only=True` for controllers that use
+their configured speed when velocities are omitted. Its optional
+`wait_for_completion(node, result_future)` callback can wait for measured
+arrival and a stopped controller. The callback spins the supplied node and
+raises on failure. Once it returns, hpp-exec waits up to five seconds for a
+successful ROS result. Failed, timed-out or interrupted waits request
+cancellation. Without this callback, the existing ROS-result wait
+and 60-second timeout apply.
+
+`execute_segments()` accepts these same two options. Its completion callback
+receives `(node, result_future, segment_configs)` for the current segment,
+before its post-actions run. Joint selection applies to the sent message;
+the callback receives the original configuration vectors for that segment.
+
 ## Tutorials
 
 The maintained end-to-end examples live in `hpp_tutorial`.
