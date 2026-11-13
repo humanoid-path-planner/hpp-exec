@@ -5,8 +5,8 @@ description = "ROS2 execution utilities for HPP-generated trajectories"
 readme = "README.md"
 license = "BSD-2-Clause"
 authors = [
-  {name = "Florent Lamiraux"},
-  {name = "Paul Saurdin"}
+  { name = "Florent Lamiraux" },
+  { name = "Paul Saurdin" }
 ]
 requires-python = ">=3.10"
 classifiers = [
