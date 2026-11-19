@@ -26,7 +26,7 @@ from hpp_exec.graph_segments import (
 )
 from hpp_exec.segments import Segment
 
-__version__ = "0.1.0"
+__version__ = "9.0.2"
 
 _ROS_MODULES = {
     "rclpy",

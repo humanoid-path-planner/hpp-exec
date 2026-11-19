@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "hpp-exec"
 version = "9.0.2"
@@ -12,7 +16,6 @@ requires-python = ">=3.10"
 classifiers = [
   "Development Status :: 3 - Alpha",
   "Intended Audience :: Science/Research",
-  "License :: OSI Approved :: BSD License",
   "Operating System :: POSIX :: Linux",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.10",
@@ -46,3 +49,6 @@ python_files = ["test_*.py"]
 [tool.ruff.lint]
 select = ["E", "F", "W", "I"]
 ignore = ["E501"]
+
+[tool.setuptools.packages.find]
+include = ["hpp_exec*"]
